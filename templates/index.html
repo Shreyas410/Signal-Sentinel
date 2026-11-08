@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Sentinel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a href="{{ url_for('landing') }}" class="brand">
+        <div class="brand-mark">◈</div>
+        <div class="brand-text">
+          <div class="brand-name">Signal Sentinel <span class="brand-back">← overview</span></div>
+          <div class="brand-sub">AI threat intelligence that updates itself — for code &amp; for customers</div>
+        </div>
+      </a>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="pipeline">AI Security Agent</button>
+        <button class="tab" data-tab="intel">Threat Intel <span class="tab-badge hidden" id="intel-badge">0</span></button>
+        <button class="tab" data-tab="scam">Customer Shield</button>
+        <button class="tab" data-tab="metrics">Metrics</button>
+      </nav>
+    </header>
+
+    <main>
+      <!-- ===================== PIPELINE TAB ===================== -->
+      <section class="panel active" id="panel-pipeline">
+        <div class="panel-head">
+          <div>
+            <h1>AI Code Security Agent</h1>
+            <p class="muted">Picks a repository, checks it live against every analyst-approved attack pattern, and explains what it finds.</p>
+          </div>
+          <div class="run-controls">
+            <select id="repo-select" class="select"></select>
+            <button class="btn btn-primary" id="run-scan-btn">▶ Run AI Scan</button>
+          </div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-orb-wrap">
+            <div class="agent-orb idle" id="agent-orb">
+              <div class="agent-orb-core"></div>
+            </div>
+          </div>
+          <div class="agent-main">
+            <div class="agent-status" id="agent-status">Idle — pick a repository and click <b>Run AI Scan</b>.</div>
+            <div class="agent-meta" id="agent-meta"></div>
+            <div class="agent-feed" id="agent-feed">
+              <div class="feed-empty muted">The agent's reasoning will appear here, step by step, as it checks the code.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card badge-card" id="badge-card">
+            <div class="card-title">Security badge</div>
+            <div class="badge-display" id="badge-display">
+              <div class="badge-ring" id="badge-ring">
+                <span id="badge-ring-text">—</span>
+              </div>
+              <div class="badge-copy">
+                <div class="badge-headline" id="badge-headline">Not scanned yet</div>
+                <div class="badge-sub" id="badge-sub">Run a scan to generate this build's badge.</div>
+              </div>
+            </div>
+            <div class="stat-row" id="stat-row">
+              <div class="stat"><div class="stat-num" id="stat-critical">0</div><div class="stat-label sev-critical">Critical</div></div>
+              <div class="stat"><div class="stat-num" id="stat-high">0</div><div class="stat-label sev-high">High</div></div>
+              <div class="stat"><div class="stat-num" id="stat-medium">0</div><div class="stat-label sev-medium">Medium</div></div>
+              <div class="stat"><div class="stat-num" id="stat-low">0</div><div class="stat-label sev-low">Low</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">How this scan works</div>
+            <ol class="howitworks">
+              <li><b>Connect</b> — load the selected repository's files.</li>
+              <li><b>Load intel</b> — pull the current analyst-approved pattern library (see Threat Intel tab).</li>
+              <li><b>Check</b> — test the code against each pattern live, one at a time.</li>
+              <li><b>Explain</b> — for every match, show the file, the line, why it matters, and a concrete fix.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="stale-banner" id="stale-banner">⚠ Code was just updated by an applied fix. Re-run the AI scan to refresh line numbers before applying another fix.</div>
+
+        <div class="card">
+          <div class="card-title-row">
+            <div class="card-title">Findings <span class="muted" id="findings-count"></span></div>
+            <div class="sev-filter" id="sev-filter">
+              <button class="chip active" data-sev="all">All</button>
+              <button class="chip" data-sev="critical">Critical</button>
+              <button class="chip" data-sev="high">High</button>
+              <button class="chip" data-sev="medium">Medium</button>
+              <button class="chip" data-sev="low">Low</button>
+            </div>
+          </div>
+          <div id="findings-list" class="findings-list">
+            <div class="empty-state muted">No findings yet — run a scan.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== THREAT INTEL TAB ===================== -->
+      <section class="panel" id="panel-intel">
+        <div class="panel-head">
+          <div>
+            <h1>Threat-Intel Feed</h1>
+            <p class="muted">One agent, two live public sources: the CISA KEV catalog for code vulnerabilities, and the OpenPhish community feed for active phishing domains. Both draft candidates here — nothing goes live until a human analyst approves it.</p>
+          </div>
+          <button class="btn btn-primary" id="sync-btn">🌐 Sync Threat Intel from Web</button>
+        </div>
+        <div class="sync-status muted" id="sync-status">Not synced yet this session.</div>
+
+        <div class="alert-banner" id="approve-toast"></div>
+
+        <div class="new-vuln-section">
+          <div class="new-vuln-head">
+            <span class="bell">🔔</span>
+            <div>
+              <div class="new-vuln-title">New AI-Detected Vulnerabilities <span class="muted" id="pending-count-label"></span></div>
+              <div class="muted">Not yet active in the scanner — review each report below and approve to add it to the AI's memory.</div>
+            </div>
+          </div>
+          <div id="pending-list" class="report-list"></div>
+        </div>
+
+        <div class="new-vuln-section">
+          <div class="new-vuln-head">
+            <span class="bell">🚫</span>
+            <div>
+              <div class="new-vuln-title">New Scam Domains Pending Review <span class="muted" id="pending-domains-count-label"></span></div>
+              <div class="muted">Not yet active in the firewall — approve to start blocking connections to it.</div>
+            </div>
+          </div>
+          <div id="pending-domains-list" class="report-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🧠 In AI memory — active in every scan</div>
+          <div id="approved-list" class="intel-list"></div>
+        </div>
+      </section>
+
+      <!-- ===================== SCAM SHIELD TAB ===================== -->
+      <section class="panel" id="panel-scam">
+        <div class="panel-head">
+          <div>
+            <h1>Customer Scam Shield</h1>
+            <p class="muted">Before, during and after a threat — inside your app.</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Trending this week</div>
+            <div id="trending-list" class="trending-list"></div>
+          </div>
+
+          <div class="phone-mock">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="phone-header">Live Message Shield</div>
+              <p class="firewall-intro">Every message is checked automatically the instant it arrives — the wording, and any link inside it.</p>
+
+              <div id="inbox-feed" class="inbox-feed"></div>
+
+              <button class="manual-toggle" id="manual-toggle-btn">✍️ Test a message by hand ▾</button>
+              <div class="manual-panel hidden" id="manual-panel">
+                <textarea id="scam-input" placeholder="Paste a suspicious text message or link here...">USPS: Your package could not be delivered. Pay a $1.99 redelivery fee within 24 hours at http://usps-redelivery.top/track</textarea>
+                <button class="btn btn-primary full" id="scam-check-btn">Check this message</button>
+
+                <div id="scam-result" class="scam-result hidden">
+                  <div class="risk-gauge">
+                    <div class="risk-ring" id="risk-ring"><span id="risk-score">0%</span></div>
+                    <div class="risk-label" id="risk-label">—</div>
+                  </div>
+                  <ul id="scam-reasons" class="reasons-list"></ul>
+                  <div id="links-checked-box" class="links-checked-box hidden"></div>
+                  <div class="scam-actions">
+                    <button class="btn btn-danger" id="btn-already-clicked">I already clicked →</button>
+                    <button class="btn btn-ghost" id="btn-block-report">Block &amp; report</button>
+                  </div>
+                  <div id="recovery-box" class="recovery-box hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🌐 Recently blocked across the network</div>
+          <div id="blocked-domains-list" class="trending-list"></div>
+        </div>
+      </section>
+
+      <!-- ===================== METRICS TAB ===================== -->
+      <section class="panel" id="panel-metrics">
+        <div class="panel-head">
+          <div>
+            <h1>Detection Metrics</h1>
+            <p class="muted">Scored against a synthetic dataset of scam and legitimate messages.</p>
+          </div>
+        </div>
+        <div class="grid-4" id="metrics-grid"></div>
+        <div class="card">
+          <div class="card-title">Confusion matrix</div>
+          <table class="confusion-table" id="confusion-table"></table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

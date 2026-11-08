@@ -1,0 +1,52 @@
+[
+  {
+    "id": "SC-001",
+    "name": "Fake USPS/delivery redelivery fee",
+    "severity": "high",
+    "keywords": ["redelivery", "usps", "package", "delivery fee", "customs fee"],
+    "description": "Impersonates a delivery carrier and asks for a small fee to release a package.",
+    "source": "FTC Consumer Alert 2026-10-22",
+    "date_added": "2026-10-23",
+    "status": "approved"
+  },
+  {
+    "id": "SC-002",
+    "name": "Fake carrier reward / prize text",
+    "severity": "high",
+    "keywords": ["congratulations", "reward", "claim your prize", "carrier reward", "free gift"],
+    "description": "Impersonates a mobile carrier offering a reward that requires clicking a link and entering payment info.",
+    "source": "Carrier Fraud Intel Bulletin 2026-W44",
+    "date_added": "2026-11-01",
+    "status": "approved"
+  },
+  {
+    "id": "SC-003",
+    "name": "Bank account suspension urgency",
+    "severity": "critical",
+    "keywords": ["account suspended", "verify your account", "unusual activity", "confirm your identity", "24 hours"],
+    "description": "Impersonates a bank, pressuring the recipient to click a link within a short window to avoid account suspension.",
+    "source": "FBI IC3 Alert 2026-09",
+    "date_added": "2026-09-30",
+    "status": "approved"
+  },
+  {
+    "id": "SC-004",
+    "name": "IRS/government payment demand",
+    "severity": "critical",
+    "keywords": ["irs", "tax refund", "gift card", "arrest warrant", "social security number suspended"],
+    "description": "Impersonates a government agency demanding payment via gift card or wire to avoid legal action.",
+    "source": "FTC Consumer Alert 2026-08",
+    "date_added": "2026-08-14",
+    "status": "approved"
+  },
+  {
+    "id": "SC-005",
+    "name": "Toll road unpaid fee text (regional spike)",
+    "severity": "medium",
+    "keywords": ["toll", "unpaid toll", "e-zpass", "sunpass", "pay now to avoid"],
+    "description": "Impersonates a toll authority, trending heavily this week in TX, FL and CA.",
+    "source": "FBI IC3 Alert 2026-11-03",
+    "date_added": "2026-11-03",
+    "status": "pending"
+  }
+]

@@ -1,0 +1,4 @@
+flask==2.0.1
+urllib3==1.26.4
+jinja2==2.11.2
+cryptography==3.2

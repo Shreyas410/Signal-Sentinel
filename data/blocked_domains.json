@@ -1,0 +1,136 @@
+[
+  {
+    "domain": "usps-redelivery.top",
+    "category": "Fake delivery redelivery fee",
+    "severity": "high",
+    "source": "FTC Consumer Alert 2026-10-22",
+    "date_added": "2026-10-23",
+    "status": "approved"
+  },
+  {
+    "domain": "usps-customs.top",
+    "category": "Fake customs fee",
+    "severity": "medium",
+    "source": "FTC Consumer Alert 2026-10-22",
+    "date_added": "2026-10-23",
+    "status": "approved"
+  },
+  {
+    "domain": "carrier-rewards-claim.xyz",
+    "category": "Fake carrier reward / prize",
+    "severity": "high",
+    "source": "Carrier Fraud Intel Bulletin 2026-W44",
+    "date_added": "2026-11-01",
+    "status": "approved"
+  },
+  {
+    "domain": "carrier-billing-pay.click",
+    "category": "Fake carrier billing notice",
+    "severity": "high",
+    "source": "Carrier Fraud Intel Bulletin 2026-W45",
+    "date_added": "2026-11-05",
+    "status": "approved"
+  },
+  {
+    "domain": "bofa-secure-verify.click",
+    "category": "Fake bank account verification",
+    "severity": "critical",
+    "source": "FBI IC3 Alert 2026-09",
+    "date_added": "2026-09-30",
+    "status": "approved"
+  },
+  {
+    "domain": "amazon-billing.work",
+    "category": "Fake billing update request",
+    "severity": "high",
+    "source": "FTC Consumer Alert 2026-08",
+    "date_added": "2026-08-14",
+    "status": "approved"
+  },
+  {
+    "domain": "fedex-fee.info",
+    "category": "Fake customs/delivery fee",
+    "severity": "medium",
+    "source": "FTC Consumer Alert 2026-10-22",
+    "date_added": "2026-10-23",
+    "status": "approved"
+  },
+  {
+    "domain": "apple-id-confirm.tk",
+    "category": "Fake Apple ID lock notice",
+    "severity": "high",
+    "source": "FTC Consumer Alert 2026-08",
+    "date_added": "2026-07-20",
+    "status": "approved"
+  },
+  {
+    "domain": "paypal-verify-now.xyz",
+    "category": "Fake PayPal verification",
+    "severity": "high",
+    "source": "FTC Consumer Alert 2026-08",
+    "date_added": "2026-08-14",
+    "status": "approved"
+  },
+  {
+    "domain": "ezpass-unpaid.loan",
+    "category": "Fake unpaid toll notice",
+    "severity": "medium",
+    "source": "FBI IC3 Alert 2026-11-03",
+    "date_added": "2026-11-03",
+    "status": "approved"
+  },
+  {
+    "domain": "ucsg365.vercel.app",
+    "category": "Live-reported phishing site",
+    "severity": "high",
+    "source": "OpenPhish Community Feed",
+    "date_added": "2026-11-08",
+    "status": "pending",
+    "reported_url": "https://www.ucsg365.vercel.app/"
+  },
+  {
+    "domain": "365973.top",
+    "category": "Live-reported phishing site",
+    "severity": "high",
+    "source": "OpenPhish Community Feed",
+    "date_added": "2026-11-08",
+    "status": "pending",
+    "reported_url": "https://www.365973.top/downapp"
+  },
+  {
+    "domain": "sprl.me",
+    "category": "Live-reported phishing site",
+    "severity": "high",
+    "source": "OpenPhish Community Feed",
+    "date_added": "2026-11-08",
+    "status": "pending",
+    "reported_url": "https://sprl.me/aZlTSEN"
+  },
+  {
+    "domain": "roblox.com.ss",
+    "category": "Live-reported phishing site",
+    "severity": "high",
+    "source": "OpenPhish Community Feed",
+    "date_added": "2026-11-08",
+    "status": "pending",
+    "reported_url": "https://www.roblox.com.ss/users/5757654538/profile"
+  },
+  {
+    "domain": "icloud-jp8.xyz",
+    "category": "Live-reported phishing site",
+    "severity": "high",
+    "source": "OpenPhish Community Feed",
+    "date_added": "2026-11-08",
+    "status": "pending",
+    "reported_url": "https://icloud-jp8.xyz/apple-jp-card/jp/login.html"
+  },
+  {
+    "domain": "eng-coinsquare.apper.so",
+    "category": "Live-reported phishing site",
+    "severity": "high",
+    "source": "OpenPhish Community Feed",
+    "date_added": "2026-11-08",
+    "status": "pending",
+    "reported_url": "https://eng-coinsquare.apper.so/"
+  }
+]
