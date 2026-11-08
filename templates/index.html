@@ -98,18 +98,50 @@
         </section>
       </section>
 
-      <!-- ===================== THREAT INTEL TAB ===================== -->
-      <section class="app-section" id="intel" aria-label="Threat Intel" hidden>
-        <div class="panel-head">
+      <section class="app-section" id="intel" aria-labelledby="intel-h" hidden>
+        <header class="page-head">
           <div>
-            <h1>Threat-Intel Feed</h1>
-            <p class="muted">One agent, two live public sources: the CISA KEV catalog for code vulnerabilities, and the OpenPhish community feed for active phishing domains. Both draft candidates here — nothing goes live until a human analyst approves it.</p>
+            <h1 id="intel-h">Threat Intel</h1>
+            <p>Every entry the agent has drafted from the CISA KEV catalog and the OpenPhish feed, plus the hand-seeded starting rules. Drafts are approved or rejected in <a href="#agent">AI Security Agent</a>.</p>
           </div>
-          <button class="btn btn-primary" id="sync-btn">🌐 Sync Threat Intel from Web</button>
-        </div>
-        <div class="sync-status muted" id="sync-status">Not synced yet this session.</div>
+          <button class="btn btn-primary" id="sync-btn" type="button">Sync feeds now</button>
+        </header>
 
-        <p class="muted">Drafted rules are reviewed in <a href="#agent">AI Security Agent</a>.</p>
+        <p class="note" id="sync-status" aria-live="polite">Sync reads both public feeds and drafts rules for anything new. If a feed cannot be reached, the last local copy is used.</p>
+
+        <div class="block table-wrap fit">
+          <table>
+            <thead><tr><th scope="col">Feed</th><th scope="col">Status</th><th scope="col">Last sync</th><th scope="col">Entries read</th><th scope="col">New drafts at last sync</th></tr></thead>
+            <tbody id="feed-meta-body"><tr><td colspan="5" class="state">Loading feed status&hellip;</td></tr></tbody>
+          </table>
+        </div>
+
+        <section class="block" aria-labelledby="entries-h">
+          <div class="block-head">
+            <h2 id="entries-h">Intel entries <span class="count" id="entries-count"></span></h2>
+            <div class="filter" id="feed-filter" role="group" aria-label="Filter by feed">
+              <button type="button" data-feed="all" aria-pressed="true">All</button>
+              <button type="button" data-feed="CISA KEV" aria-pressed="false">CISA KEV</button>
+              <button type="button" data-feed="OpenPhish" aria-pressed="false">OpenPhish</button>
+              <button type="button" data-feed="Seed list" aria-pressed="false">Seed list</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="intel-table">
+              <thead>
+                <tr>
+                  <th scope="col" data-sort="entry"><button type="button" class="sort">Entry</button></th>
+                  <th scope="col" data-sort="feed"><button type="button" class="sort">Feed</button></th>
+                  <th scope="col" data-sort="sev"><button type="button" class="sort">Severity</button></th>
+                  <th scope="col" class="wrap">Detail</th>
+                  <th scope="col" data-sort="status"><button type="button" class="sort">Status</button></th>
+                  <th scope="col" data-sort="date" aria-sort="descending"><button type="button" class="sort">Added <span aria-hidden="true">&darr;</span></button></th>
+                </tr>
+              </thead>
+              <tbody id="intel-body"><tr><td colspan="6" class="state">Loading entries&hellip;</td></tr></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <!-- ===================== SCAM SHIELD TAB ===================== -->

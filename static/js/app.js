@@ -27,6 +27,7 @@ async function loadFeedStatus() {
       fetch("/api/blocked-domains/meta").then(r => r.json()),
     ]);
     el.innerHTML = feedStatusRow("CISA KEV", kev) + feedStatusRow("OpenPhish", phish);
+    if (typeof loadFeedMetaTable === "function") loadFeedMetaTable();
   } catch (e) {
     el.innerHTML = "<dt>Feeds</dt><dd>Status unavailable</dd>";
   }
@@ -540,6 +541,117 @@ document.getElementById("sync-btn").addEventListener("click", async () => {
   loadFeedStatus();
 });
 
+
+// ---------------- Threat Intel: feed status table + entries table ----------------
+function feedMetaRow(name, meta, unit) {
+  if (!meta || !meta.last_synced_at) {
+    return `<tr><th scope="row">${name}</th><td><span class="tag tag-pending">not synced</span></td><td colspan="3" class="muted">No sync has run yet. Click Sync feeds now.</td></tr>`;
+  }
+  const live = meta.source === "live";
+  const status = live
+    ? '<span class="tag tag-approved">live</span>'
+    : `<span class="tag tag-suspicious">local cache</span><span class="cell-sub">Feed unreachable; used ${escapeHtml(meta.source)}</span>`;
+  return `<tr>
+    <th scope="row">${name}</th>
+    <td class="top wrap">${status}</td>
+    <td class="data nowrap">${escapeHtml(meta.last_synced_at)}</td>
+    <td class="num">${escapeHtml(meta.total_seen)} ${unit}</td>
+    <td class="num">${meta.new_count == null ? "n/a" : escapeHtml(meta.new_count)}</td>
+  </tr>`;
+}
+
+async function loadFeedMetaTable() {
+  const body = document.getElementById("feed-meta-body");
+  try {
+    const [kev, phish] = await Promise.all([getJson("/api/threat-intel/meta"), getJson("/api/blocked-domains/meta")]);
+    body.innerHTML = feedMetaRow("CISA KEV", kev, "CVEs") + feedMetaRow("OpenPhish", phish, "URLs");
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="5" class="state state-error">Could not load feed status from the server.</td></tr>';
+  }
+}
+
+let intelSort = { key: "date", dir: -1 };
+let intelFeed = "all";
+const STATUS_ORDER = { pending: 0, approved: 1, rejected: 2 };
+
+function intelRows() {
+  const { patterns, domains } = intelCache;
+  const rows = patterns.map(p => ({
+    key: p.id, kind: "code",
+    feed: p.source_cve ? "CISA KEV" : "Seed list",
+    entry: p.source_cve
+      ? (p.source_url ? `<a class="data" href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener">${escapeHtml(p.source_cve)}</a>` : `<span class="data">${escapeHtml(p.source_cve)}</span>`)
+      : `<span class="data">${escapeHtml(p.id)}</span>`,
+    entryText: p.source_cve || p.id,
+    detail: `${escapeHtml(splitRuleName(p.name)[0])}<span class="cell-sub">${escapeHtml(p.cwe || "")}${p.cwe ? " &middot; " : ""}${escapeHtml(p.source)}</span>`,
+    sev: p.severity, status: p.status, date: p.date_added || "",
+  })).concat(domains.map(d => ({
+    key: d.domain, kind: "domain",
+    feed: d.source === "OpenPhish Community Feed" ? "OpenPhish" : "Seed list",
+    entry: `<span class="data break">${escapeHtml(d.domain)}</span>`,
+    entryText: d.domain,
+    detail: `${escapeHtml(d.category)}<span class="cell-sub">${escapeHtml(d.source)}</span>`,
+    sev: d.severity, status: d.status || "approved", date: d.date_added || "",
+  })));
+  return rows;
+}
+
+function renderIntelTable() {
+  const body = document.getElementById("intel-body");
+  if (!body) return;
+  let rows = intelRows();
+  const total = rows.length;
+  if (intelFeed !== "all") rows = rows.filter(r => r.feed === intelFeed);
+  const k = intelSort.key, dir = intelSort.dir;
+  const val = r => k === "sev" ? (SEV_ORDER[r.sev] ?? 9) : k === "status" ? (STATUS_ORDER[r.status] ?? 9) : k === "entry" ? r.entryText.toLowerCase() : k === "feed" ? r.feed : r.date;
+  rows.sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || a.entryText.localeCompare(b.entryText); });
+  document.getElementById("entries-count").textContent = intelFeed === "all" ? `(${total})` : `(${rows.length} of ${total})`;
+  if (!total) {
+    body.innerHTML = '<tr><td colspan="6" class="state">No intel entries yet. Click Sync feeds now to read the public feeds.</td></tr>';
+    return;
+  }
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="6" class="state">No entries from ${escapeHtml(intelFeed)} yet. Sync the feeds to draft some.</td></tr>`;
+    return;
+  }
+  const fresh = new Set(lastSync.code.concat(lastSync.domains));
+  body.innerHTML = rows.map(r => `
+    <tr class="${fresh.has(r.key) ? "is-new" : ""}">
+      <td class="nowrap">${r.entry}${fresh.has(r.key) ? ' <span class="tag tag-where">new</span>' : ""}</td>
+      <td class="nowrap">${r.feed}</td>
+      <td>${sevTag(r.sev)}</td>
+      <td class="top wrap">${r.detail}</td>
+      <td>${r.status === "pending" ? '<a href="#agent">' + statusTag(r.status) + '</a>' : statusTag(r.status)}</td>
+      <td class="data nowrap">${escapeHtml(r.date)}</td>
+    </tr>`).join("");
+}
+
+document.querySelector("#intel-table thead").addEventListener("click", e => {
+  const th = e.target.closest("th[data-sort]");
+  if (!th) return;
+  const key = th.dataset.sort;
+  intelSort = { key, dir: intelSort.key === key ? -intelSort.dir : (key === "date" ? -1 : 1) };
+  document.querySelectorAll("#intel-table th[data-sort]").forEach(h => {
+    const btn = h.querySelector("button");
+    const arrow = btn.querySelector("span");
+    if (arrow) arrow.remove();
+    if (h === th) {
+      h.setAttribute("aria-sort", intelSort.dir === 1 ? "ascending" : "descending");
+      btn.insertAdjacentHTML("beforeend", `<span aria-hidden="true">${intelSort.dir === 1 ? "&uarr;" : "&darr;"}</span>`);
+    } else {
+      h.removeAttribute("aria-sort");
+    }
+  });
+  renderIntelTable();
+});
+
+document.getElementById("feed-filter").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  intelFeed = b.dataset.feed;
+  document.querySelectorAll("#feed-filter button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderIntelTable();
+});
 
 // ---------------- Scam Shield tab ----------------
 async function loadTrending() {
