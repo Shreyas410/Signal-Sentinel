@@ -237,8 +237,8 @@ document.getElementById("queue").addEventListener("click", async e => {
     btn.dataset.label = btn.textContent;
     btn.textContent = action === "approve" ? "Confirm approval" : "Confirm rejection";
     hint.textContent = action === "approve"
-      ? `Click again to enforce this rule in ${btn.dataset.where}.`
-      : "Click again to reject. Rejected rules are not enforced.";
+      ? `Press Confirm approval to enforce this rule in ${btn.dataset.where}. Esc cancels.`
+      : "Press Confirm rejection to reject. Rejected rules are not enforced. Esc cancels.";
     clearTimeout(btn._t);
     btn._t = setTimeout(() => { disarm(btn); hint.textContent = ""; }, 6000);
     return;
@@ -265,13 +265,23 @@ document.getElementById("queue").addEventListener("click", async e => {
     }
     await loadThreatIntel();
     loadFeedStatus();
-    if (action === "approve") document.getElementById("enforced-h").scrollIntoView({ block: "start", behavior: "smooth" });
+    if (action === "approve") {
+      const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById("enforced-h").scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+    }
   } catch (err) {
     notice(`Could not ${action} ${key}: the server did not accept the request. Nothing was changed.`, true);
     item.querySelectorAll("button[data-decide]").forEach(b => { b.disabled = false; disarm(b); });
     setBusy(btn, false);
     btn.textContent = action === "approve" ? "Approve" : "Reject";
   }
+});
+
+// Escape cancels an armed Approve/Reject.
+document.getElementById("queue").addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const armed = e.target.closest(".rule") && e.target.closest(".rule").querySelector(".is-confirming");
+  if (armed) { clearTimeout(armed._t); disarm(armed); armed.closest(".rule").querySelector(".hint").textContent = "Cancelled."; }
 });
 
 function disarm(btn) {
@@ -859,6 +869,16 @@ async function loadMetrics() {
       <p class="note block">The test set is synthetic: ${m.dataset_size} messages generated from 24 hand-written templates, so these figures show the engine works on known scam shapes rather than predicting real-world accuracy. Overall accuracy: ${pct(m.accuracy)}.</p>
     </section>`;
 }
+
+// In-page jump links (buttons, so they don't fight the section hash).
+document.querySelector(".jump").addEventListener("click", e => {
+  const b = e.target.closest("button[data-jump]");
+  if (!b) return;
+  const target = document.getElementById(b.dataset.jump);
+  target.setAttribute("tabindex", "-1");
+  target.scrollIntoView({ block: "start" });
+  target.focus({ preventScroll: true });
+});
 
 // ---------------- Boot: show the section named in the URL ----------------
 showSection(location.hash.slice(1), false);

@@ -45,7 +45,7 @@ select, textarea, input[type="text"] {
 select:hover, textarea:hover { border-color: var(--text-faint); }
 select:disabled { opacity: 0.45; cursor: not-allowed; }
 textarea { width: 100%; min-height: 6rem; resize: vertical; font-family: var(--font-data); line-height: var(--leading-body); }
-::placeholder { color: var(--text-faint); }
+::placeholder { color: var(--text-muted); opacity: 1; }
 
 /* ---------- Tags (status / verdict): text label always present ---------- */
 .tag {
@@ -89,6 +89,7 @@ td.state { height: auto; }
 }
 .notice.is-error { border-left-color: var(--reject); }
 .notice:empty { display: none; }
+.jump { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); margin: calc(var(--space-3) * -1) 0 var(--space-4); }
 
 /* ---------- App shell additions ---------- */
 .wordmark { padding: 0 var(--space-4) var(--space-4); }
@@ -160,6 +161,7 @@ td.state { height: auto; }
 /* ---------- Table helpers ---------- */
 td.wrap, th.wrap { white-space: normal; }
 td.wrap { min-width: 14rem; }
+td.break { min-width: 12rem; }  /* long domains wrap only when truly longer than this */
 .table-wrap.fit td.wrap { min-width: 0; }
 td { vertical-align: middle; }
 td.top { vertical-align: top; padding-top: var(--space-2); padding-bottom: var(--space-2); }
@@ -188,7 +190,7 @@ th[aria-sort] button.sort { color: var(--text); }
 .log .k-found { color: var(--sev-high); }
 .log .k-done { color: var(--approve); }
 .log .k-error { color: var(--reject); }
-.log .k-clear { color: var(--text-faint); }
+.log .k-clear { color: var(--text-muted); }
 .log li.clear { color: var(--text-muted); }
 
 .filter { display: inline-flex; border: var(--border-width) solid var(--border-strong); border-radius: var(--radius-md); overflow: hidden; }
@@ -283,3 +285,12 @@ tr.detail td { height: auto; padding: var(--space-3); background: var(--surface-
 .honest { margin-top: var(--space-7); padding-top: var(--space-4); border-top: var(--border-width) solid var(--border); font-size: var(--text-sm); color: var(--text-muted); }
 .honest dt { color: var(--text); font-weight: 500; margin-top: var(--space-3); }
 .honest dd { margin: var(--space-1) 0 0; }
+
+/* ---------- Narrow screens: 44px touch targets ---------- */
+@media (max-width: 760px) {
+  .filter button, .btn-sm, th button.sort, .site-nav a { min-height: var(--tap-min); }
+  .site-nav a { display: inline-flex; align-items: center; }
+  .filter { flex-wrap: wrap; }
+  .page-head .btn, .toolbar { width: 100%; }
+  .toolbar select { flex: 1; min-width: 0; }
+}

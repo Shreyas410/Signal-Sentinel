@@ -33,12 +33,19 @@
           </div>
         </header>
 
+        <nav class="jump" aria-label="On this page">
+          <span class="label">Jump to</span>
+          <button type="button" class="link-btn" data-jump="queue-h">Approval queue</button>
+          <button type="button" class="link-btn" data-jump="enforced-h">Enforced</button>
+          <button type="button" class="link-btn" data-jump="scan-h">Dev/CI scan</button>
+        </nav>
+
         <div class="notice" id="decision-notice" role="status" aria-live="polite"></div>
 
         <section aria-labelledby="queue-h">
           <div class="block-head">
             <h2 id="queue-h">Rules awaiting analyst approval <span class="count" id="queue-count"></span></h2>
-            <p>Approving takes two clicks, Approve and then Confirm, so a rule is never enforced by accident.</p>
+            <p>Approving takes two steps, Approve and then Confirm, so a rule is never enforced by accident.</p>
           </div>
           <ol class="queue" id="queue" aria-busy="true">
             <li class="panel state">Loading drafted rules&hellip;</li>
