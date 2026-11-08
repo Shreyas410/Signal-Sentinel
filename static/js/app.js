@@ -1,16 +1,44 @@
-// ---------------- Tabs ----------------
-document.querySelectorAll(".tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
-    if (btn.dataset.tab === "intel") loadThreatIntel();
-    if (btn.dataset.tab === "scam") { loadTrending(); loadBlockedDomains(); startInboxFeed(); }
-    else { stopInboxFeed(); }
-    if (btn.dataset.tab === "metrics") loadMetrics();
+// ---------------- Shell: rail navigation (hash-based) ----------------
+const SECTIONS = ["agent", "intel", "shield", "metrics"];
+
+function showSection(id, focus) {
+  if (!SECTIONS.includes(id)) id = "agent";
+  SECTIONS.forEach(s => { document.getElementById(s).hidden = s !== id; });
+  document.querySelectorAll("#rail-nav a").forEach(a => {
+    if (a.dataset.section === id) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
   });
-});
+  if (id === "intel") loadThreatIntel();
+  if (id === "shield") { loadTrending(); loadBlockedDomains(); startInboxFeed(); }
+  else { stopInboxFeed(); }
+  if (id === "metrics") loadMetrics();
+  if (focus) document.getElementById("main").focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener("hashchange", () => showSection(location.hash.slice(1), true));
+
+// Feed status in the rail: live, local cache, or never synced. Real values only.
+async function loadFeedStatus() {
+  const el = document.getElementById("feed-status");
+  try {
+    const [kev, phish] = await Promise.all([
+      fetch("/api/threat-intel/meta").then(r => r.json()),
+      fetch("/api/blocked-domains/meta").then(r => r.json()),
+    ]);
+    el.innerHTML = feedStatusRow("CISA KEV", kev) + feedStatusRow("OpenPhish", phish);
+  } catch (e) {
+    el.innerHTML = "<dt>Feeds</dt><dd>Status unavailable</dd>";
+  }
+}
+
+function feedStatusRow(name, meta) {
+  let state;
+  if (!meta || !meta.last_synced_at) state = "Not synced yet";
+  else if (meta.source === "live") state = "Live · " + meta.last_synced_at;
+  else state = "Local cache · " + (meta.source || "").replace(/^cached \(fetched /, "").replace(/\)$/, "");
+  return `<dt>${name}</dt><dd>${escapeHtml(state)}</dd>`;
+}
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 let currentFindings = [];
@@ -25,6 +53,7 @@ async function loadRepos() {
 }
 loadRepos();
 loadThreatIntel();
+loadFeedStatus();
 
 // ---------------- AI Agent feed ----------------
 const ICONS = { info: "ℹ", checking: "◐", clear: "·", found: "⚠", done: "✓", error: "✕" };
@@ -257,14 +286,8 @@ async function loadThreatIntel() {
   const approved = patterns.filter(p => p.status === "approved").sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
   const pendingDomains = domains.filter(d => d.status === "pending");
 
-  const badge = document.getElementById("intel-badge");
   const totalPending = pending.length + pendingDomains.length;
-  if (totalPending) {
-    badge.textContent = totalPending;
-    badge.classList.remove("hidden");
-  } else {
-    badge.classList.add("hidden");
-  }
+  document.getElementById("rail-pending").textContent = totalPending ? totalPending : "";
   document.getElementById("pending-count-label").textContent = pending.length
     ? `— ${pending.length} awaiting review`
     : "— none right now";
@@ -621,3 +644,6 @@ async function loadMetrics() {
     <tr><th>Actual Legit</th><td>${m.false_positive}</td><td>${m.true_negative}</td></tr>
   `;
 }
+
+// ---------------- Boot: show the section named in the URL ----------------
+showSection(location.hash.slice(1), false);

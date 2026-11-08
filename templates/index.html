@@ -2,26 +2,31 @@
 {% block title %}Signal Sentinel · Console{% endblock %}
 {% block body_class %}{% endblock %}
 {% block content %}
-  <div class="app-shell">
-    <header class="topbar">
-      <a href="{{ url_for('landing') }}" class="brand">
-        <div class="brand-mark">◈</div>
-        <div class="brand-text">
-          <div class="brand-name">Signal Sentinel <span class="brand-back">← overview</span></div>
-          <div class="brand-sub">AI threat intelligence that updates itself — for code &amp; for customers</div>
-        </div>
-      </a>
-      <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="pipeline">AI Security Agent</button>
-        <button class="tab" data-tab="intel">Threat Intel <span class="tab-badge hidden" id="intel-badge">0</span></button>
-        <button class="tab" data-tab="scam">Customer Shield</button>
-        <button class="tab" data-tab="metrics">Metrics</button>
+  <a class="sr-only" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="rail" aria-label="Sections">
+      <div class="wordmark">
+        <a href="{{ url_for('landing') }}">Signal Sentinel</a>
+        <span class="label">Analyst console</span>
+      </div>
+      <nav id="rail-nav">
+        <a href="#agent" data-section="agent">AI Security Agent <span class="rail-count" id="rail-pending" title="Rules awaiting approval"></span></a>
+        <a href="#intel" data-section="intel">Threat Intel</a>
+        <a href="#shield" data-section="shield">Customer Shield</a>
+        <a href="#metrics" data-section="metrics">Metrics</a>
       </nav>
-    </header>
+      <div class="feed-status" aria-live="polite">
+        <span class="label">Feed status</span>
+        <dl id="feed-status">
+          <dt>CISA KEV</dt><dd>checking&hellip;</dd>
+          <dt>OpenPhish</dt><dd>checking&hellip;</dd>
+        </dl>
+      </div>
+    </aside>
 
-    <main>
+    <main class="content" id="main" tabindex="-1">
       <!-- ===================== PIPELINE TAB ===================== -->
-      <section class="panel active" id="panel-pipeline">
+      <section class="app-section" id="agent" aria-label="AI Security Agent">
         <div class="panel-head">
           <div>
             <h1>AI Code Security Agent</h1>
@@ -98,7 +103,7 @@
       </section>
 
       <!-- ===================== THREAT INTEL TAB ===================== -->
-      <section class="panel" id="panel-intel">
+      <section class="app-section" id="intel" aria-label="Threat Intel" hidden>
         <div class="panel-head">
           <div>
             <h1>Threat-Intel Feed</h1>
@@ -139,7 +144,7 @@
       </section>
 
       <!-- ===================== SCAM SHIELD TAB ===================== -->
-      <section class="panel" id="panel-scam">
+      <section class="app-section" id="shield" aria-label="Customer Shield" hidden>
         <div class="panel-head">
           <div>
             <h1>Customer Scam Shield</h1>
@@ -191,7 +196,7 @@
       </section>
 
       <!-- ===================== METRICS TAB ===================== -->
-      <section class="panel" id="panel-metrics">
+      <section class="app-section" id="metrics" aria-label="Metrics" hidden>
         <div class="panel-head">
           <div>
             <h1>Detection Metrics</h1>
