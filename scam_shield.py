@@ -48,12 +48,17 @@ def _is_lookalike(url_host, brand):
     if not real:
         return False
     host = url_host.lower()
-    if host == real:
+    # The real domain and its own subdomains (e.g. smile.amazon.com) are
+    # not lookalikes.
+    if host == real or host.endswith("." + real):
         return False
-    # crude leetspeak / char-swap lookalike check
-    normalized = host.replace("1", "i").replace("0", "o").replace("rn", "m")
+    # Crude leetspeak / char-swap lookalike check. "1" is ambiguous (it
+    # stands in for both "l" and "i"), so try each reading.
+    base = (host.replace("0", "o").replace("3", "e").replace("5", "s")
+                .replace("rn", "m").replace("vv", "w"))
+    variants = {base.replace("1", "l"), base.replace("1", "i")}
     brand_core = real.split(".")[0]
-    return brand_core in normalized and host != real
+    return any(brand_core in v for v in variants)
 
 
 def _synthetic_domain_age_days(host):
