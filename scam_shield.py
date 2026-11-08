@@ -1,4 +1,5 @@
 """Phase 2 — heuristic scam/phishing message & link risk scorer."""
+import hashlib
 import json
 import os
 import re
@@ -15,7 +16,7 @@ PAYMENT_WORDS = ["gift card", "crypto", "bitcoin", "zelle", "wire transfer", "sm
                  "processing fee", "redelivery fee", "pay now"]
 IMPERSONATION_BRANDS = ["usps", "fedex", "ups", "irs", "carrier", "bank of america",
                         "amazon", "apple", "paypal", "social security"]
-RISKY_TLDS = [".top", ".xyz", ".click", ".click", ".work", ".info", ".tk", ".loan"]
+RISKY_TLDS = [".top", ".xyz", ".click", ".work", ".info", ".tk", ".loan"]
 
 LOOKALIKE_BRANDS = {
     "usps": "usps.com",
@@ -55,10 +56,12 @@ def _is_lookalike(url_host, brand):
     return brand_core in normalized and host != real
 
 
-def _synthetic_domain_age_days(url):
-    # deterministic pseudo-"WHOIS" lookup for demo purposes, seeded by domain text
-    h = abs(hash(url)) % 400
-    return h
+def _synthetic_domain_age_days(host):
+    # Deterministic pseudo-"WHOIS" lookup for demo purposes, seeded by the
+    # domain name. Uses SHA-256 rather than the built-in hash(), which is
+    # randomized per process and would give a different age on every run.
+    digest = hashlib.sha256(host.encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") % 400
 
 
 def analyze_message(text, patterns=None):
@@ -215,7 +218,7 @@ def analyze_link(url, blocked_domains=None):
             score += 40
             reasons.append(f"Looks like a lookalike of {LOOKALIKE_BRANDS[matched_brand]}")
 
-        age_days = _synthetic_domain_age_days(url)
+        age_days = _synthetic_domain_age_days(host)
         if age_days < 14:
             score += 35
             reasons.append(f"Domain was registered only {age_days} day(s) ago")
