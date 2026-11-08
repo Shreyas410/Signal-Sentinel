@@ -1,169 +1,78 @@
 {% extends "base.html" %}
 {% block title %}Signal Sentinel{% endblock %}
-{% block body_class %}landing-body{% endblock %}
 {% block content %}
-  <div class="grain-overlay"></div>
-  <div class="cursor-glow" id="cursor-glow"></div>
-
-  <header class="l-nav">
-    <div class="l-nav-inner">
-      <div class="brand">
-        <div class="brand-mark l-mark">◈</div>
-        <div class="brand-text">
-          <div class="brand-name l-brand-name">Signal Sentinel</div>
-        </div>
-      </div>
-      <a href="{{ url_for('dashboard') }}" class="btn l-btn-primary">Launch the dashboard →</a>
-    </div>
+<div class="site">
+  <header class="site-nav">
+    <span class="name">Signal Sentinel</span>
+    <a href="{{ url_for('dashboard') }}">Open the analyst console</a>
   </header>
 
-  <!-- ===================== LIVE TICKER ===================== -->
-  <div class="ticker">
-    <div class="ticker-track" id="ticker-track">
-      <span>LOADING LIVE THREAT FEED…</span>
-    </div>
-  </div>
+  <main>
+    <section class="lede" aria-labelledby="lede-h">
+      <h1 id="lede-h">Signal Sentinel turns public threat feeds into detection rules, and enforces a rule only after a security analyst approves it.</h1>
+      <p>Each approved rule is enforced in one of two places: the CI pipeline that checks code before it ships, or the app your customers use to read their messages.</p>
+      <a class="btn btn-primary" href="{{ url_for('dashboard') }}">Open the analyst console</a>
+      <p class="live-line" id="live-line" aria-live="polite">Loading current rule counts&hellip;</p>
+    </section>
 
-  <!-- ===================== HERO ===================== -->
-  <section class="l-hero">
-    <div class="hero-blob"></div>
-    <div class="l-hero-text" data-reveal>
-      <div class="l-eyebrow">AI IS WRITING MORE OF YOUR CODE THAN EVER</div>
-      <h1>AI ships code fast.<br>It ships <span class="hl-vuln">vulnerabilities</span><br>just as fast.</h1>
-      <p class="l-sub">
-        Coding assistants now generate huge portions of production software — and they
-        reproduce the same injection flaws, hardcoded secrets and broken auth checks that
-        security teams have been fighting for decades. New attack techniques are published
-        every single day. Most scanners are trained once and quietly fall behind.
-      </p>
-      <p class="l-sub">
-        Signal Sentinel is an AI agent that never stops learning — and acts on what it learns
-        in two places at once: <b>inside the pipeline that ships your code</b>, and
-        <b>inside the app your customers use every day</b>.
-      </p>
-      <div class="l-cta-row">
-        <a href="{{ url_for('dashboard') }}" class="btn l-btn-primary">See it live →</a>
-        <a href="#how" class="btn l-btn-ghost">How it works ↓</a>
-      </div>
-      <div class="l-stats" id="l-stats">
-        <div class="l-stat"><div class="l-stat-num c-green" id="stat-cves">—</div><div class="l-stat-lab">real published vulnerabilities tracked live</div></div>
-        <div class="l-stat"><div class="l-stat-num c-magenta" id="stat-precision">—</div><div class="l-stat-lab">precision on our scam-detection test set</div></div>
-        <div class="l-stat"><div class="l-stat-num c-amber">2</div><div class="l-stat-lab">layers of defense, one shared brain</div></div>
-      </div>
-    </div>
+    <section aria-labelledby="flow-h">
+      <h2 id="flow-h">How a rule gets enforced</h2>
+      <ol class="flow">
+        <li>
+          <h3>Public threat feeds</h3>
+          <p>The CISA Known Exploited Vulnerabilities catalog and the OpenPhish community feed, fetched on demand. If the network is down, the last local copy is used and the console says so.</p>
+        </li>
+        <li>
+          <h3>Rule drafted</h3>
+          <p>A newly exploited CVE in a weakness class the scanner can express as a pattern becomes a draft code rule. A newly reported phishing URL becomes a draft domain block.</p>
+        </li>
+        <li class="human">
+          <h3>Analyst approves</h3>
+          <p>Nothing is enforced until a person reads the rule, the feed entry behind it and what it would match, then clicks Approve and Confirm.</p>
+        </li>
+        <li>
+          <h3>Enforced</h3>
+          <p>Code rules go to the Dev/CI scanner. Domain rules go to the Customer Shield link firewall.</p>
+          <div class="ends"><span class="tag tag-where">Dev/CI scanner</span><span class="tag tag-where">Customer Shield</span></div>
+        </li>
+      </ol>
+    </section>
 
-    <div class="l-hero-visual" data-reveal>
-      <div class="scan-demo" id="scan-demo">
-        <div class="scan-beam"></div>
-        <div class="scan-window">
-          <div class="scan-dots"><span></span><span></span><span></span><span class="scan-label">live_scan.py</span></div>
-          <pre class="code-block"><code><span class="code-line">def checkout(request):</span>
-<span class="code-line vuln" style="animation-delay:.9s">  key = "admin_51Hc8x2..."<span class="vuln-tag">⚠ hardcoded secret</span></span>
-<span class="code-line">  cart_id = request.args.get("id")</span>
-<span class="code-line vuln" style="animation-delay:1.9s">  q = "SELECT * FROM carts WHERE id=" + cart_id<span class="vuln-tag">⚠ SQL injection</span></span>
-<span class="code-line">  total = calculate(cart_id)</span>
-<span class="code-line vuln" style="animation-delay:2.9s">  os.system("notify " + user_email)<span class="vuln-tag">⚠ command injection</span></span>
-<span class="code-line">  return confirm(total)</span></code></pre>
-        </div>
-        <div class="scan-caption">LIVE PATTERN MATCH AGAINST THE THREAT-INTEL FEED</div>
+    <section aria-labelledby="layers-h">
+      <h2 id="layers-h">The two enforcement layers</h2>
+      <div class="layers">
+        <section aria-labelledby="l1-h">
+          <span class="label">Layer 1 &middot; Dev/CI pipeline</span>
+          <h3 id="l1-h">Before code ships</h3>
+          <p>Scans every <code>.py</code>, <code>.js</code> and <code>.ts</code> file in a repository against the enforced code rules, and checks <code>requirements.txt</code> pins against known-vulnerable versions.</p>
+          <ul>
+            <li>Each finding shows its severity, file, line and the code that matched.</li>
+            <li>Verified one-click fixes rewrite the line only if the file still matches what was scanned.</li>
+            <li>The demo runs against two intentionally vulnerable repositories: <code>core-customer-api</code> and <code>payments-service</code>.</li>
+          </ul>
+        </section>
+        <section aria-labelledby="l2-h">
+          <span class="label">Layer 2 &middot; Customer-facing app</span>
+          <h3 id="l2-h">When a message arrives</h3>
+          <p>Scores the wording of an incoming message and every link inside it. Links are checked against the enforced domain blocklist, lookalike brand names and high-risk domain endings.</p>
+          <ul>
+            <li>The link check reads the destination domain only, never the message content, so it works the same for SMS, email or encrypted chat.</li>
+            <li>Every link gets a plain verdict: BLOCKED, SUSPICIOUS or ALLOWED, with the reason.</li>
+            <li>Customers who already clicked get a recovery checklist.</li>
+          </ul>
+        </section>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ===================== PROBLEM ===================== -->
-  <section class="l-section">
-    <h2 class="l-h2" data-reveal>The gap between how fast code ships<br>and how fast it's checked</h2>
-    <div class="l-problem-grid">
-      <div class="l-problem-card c1" data-reveal>
-        <div class="l-problem-icon">⚡</div>
-        <h3>Code ships faster than review</h3>
-        <p>AI coding assistants generate features in minutes. Manual security review hasn't gotten any faster — so more unreviewed code reaches production.</p>
-      </div>
-      <div class="l-problem-card c2" data-reveal>
-        <div class="l-problem-icon">📰</div>
-        <h3>New attacks, every single day</h3>
-        <p>Thousands of real-world vulnerabilities are disclosed every year. A scanner built once and never updated is already behind by the time it ships.</p>
-      </div>
-      <div class="l-problem-card c3" data-reveal>
-        <div class="l-problem-icon">🎯</div>
-        <h3>The weak point moves to the customer</h3>
-        <p>When code ships clean, attackers simply target people instead — phishing links and fake alerts designed to look exactly like the real app.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== TWO LAYERS ===================== -->
-  <section class="l-section" id="how">
-    <h2 class="l-h2" data-reveal>One brain. Two layers of defense.</h2>
-    <p class="l-sub l-center" data-reveal>The same live threat intelligence protects your codebase before it ships, and your customers after it does.</p>
-
-    <div class="layers-diagram">
-      <div class="layer-card layer-a" data-reveal>
-        <div class="layer-icon">🛡️</div>
-        <div class="layer-kicker">Layer 1 — production scale</div>
-        <h3>Stop vulnerable code before it ships</h3>
-        <p>Every build is checked against the full attack-pattern library. If a developer's change — AI-written or not — matches a known-exploited pattern, the pipeline flags it, explains why, and suggests the fix before it ever reaches production.</p>
-        <a class="layer-link" href="{{ url_for('dashboard') }}">Open the AI Security Agent →</a>
-      </div>
-
-      <div class="layer-brain" data-reveal>
-        <div class="agent-orb working small"><div class="agent-orb-core"></div></div>
-        <div class="layer-brain-label">SHARED<br>THREAT INTEL</div>
-        <svg class="layer-flow" viewBox="0 0 240 160" preserveAspectRatio="none">
-          <path d="M120,80 C60,80 40,30 10,10" />
-          <path d="M120,80 C180,80 200,130 230,150" />
-          <circle class="flow-dot dot-a" r="4"><animateMotion dur="2.4s" repeatCount="indefinite" path="M120,80 C60,80 40,30 10,10" /></circle>
-          <circle class="flow-dot dot-b" r="4"><animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite" path="M120,80 C180,80 200,130 230,150" /></circle>
-        </svg>
-      </div>
-
-      <div class="layer-card layer-b" data-reveal>
-        <div class="layer-icon">📱</div>
-        <div class="layer-kicker">Layer 2 — customer scale</div>
-        <h3>Catch threats before customers get hurt</h3>
-        <p>Every message is checked the instant it arrives — the wording, and any link inside it — the same way this would run at the carrier or on-device, with nothing read or stored beyond the verdict. It explains its reasoning in plain language and walks people through recovery the moment something slips through.</p>
-        <a class="layer-link" href="{{ url_for('dashboard') }}">Open the Customer Shield →</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== SELF-UPDATING TIMELINE ===================== -->
-  <section class="l-section">
-    <h2 class="l-h2" data-reveal>It gets smarter every day — with a human still in the loop</h2>
-    <div class="timeline">
-      <div class="timeline-line"><div class="timeline-dot"></div></div>
-      <div class="timeline-steps">
-        <div class="timeline-step" data-reveal>
-          <div class="timeline-num n1">1</div>
-          <h4>A new attack is published</h4>
-          <p>Picked up from real public vulnerability feeds, the moment it's disclosed.</p>
-        </div>
-        <div class="timeline-step" data-reveal>
-          <div class="timeline-num n2">2</div>
-          <h4>The agent drafts a detection rule</h4>
-          <p>It maps the weakness to a concrete signature it can test code for.</p>
-        </div>
-        <div class="timeline-step" data-reveal>
-          <div class="timeline-num n3">3</div>
-          <h4>An analyst approves it</h4>
-          <p>Nothing goes live without a human confirming it's accurate.</p>
-        </div>
-        <div class="timeline-step" data-reveal>
-          <div class="timeline-num n4">4</div>
-          <h4>Both layers update instantly</h4>
-          <p>The pipeline and the customer app both start checking for it immediately.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== CTA ===================== -->
-  <section class="l-cta-section" data-reveal>
-    <h2>Ready to see the agent work?</h2>
-    <p class="l-sub l-center">Pick a sample codebase, run a live scan, and watch the threat-intel feed update in real time.</p>
-    <a href="{{ url_for('dashboard') }}" class="btn l-btn-primary big">Launch the dashboard →</a>
-  </section>
-
-  <footer class="l-footer">Signal Sentinel — a self-updating threat-intelligence agent, built for a hackathon demo.</footer>
+    <dl class="honest">
+      <dt>Live</dt>
+      <dd>The CISA KEV and OpenPhish fetches, rule drafting, the code scan and the link scoring.</dd>
+      <dt>Simulated for the demo</dt>
+      <dd>The incoming-message feed in Customer Shield draws from a local sample pool. Domain age is a deterministic stand-in for a WHOIS lookup. Accuracy figures come from a 260-message synthetic test set.</dd>
+      <dt>Data</dt>
+      <dd>No real customer data is used anywhere.</dd>
+    </dl>
+  </main>
+</div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/landing.js') }}"></script>{% endblock %}

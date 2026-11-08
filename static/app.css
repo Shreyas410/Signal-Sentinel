@@ -250,7 +250,7 @@ tr.detail td { height: auto; padding: var(--space-3); background: var(--surface-
 .flow li + li { border-left: var(--border-width) solid var(--border); }
 .flow li::before { content: "0" counter(step); display: block; font-family: var(--font-data); font-size: var(--text-xs); color: var(--text-muted); margin-bottom: var(--space-2); }
 .flow li + li::after {
-  content: "\2192"; position: absolute; left: calc(var(--space-3) * -1); top: var(--space-4);
+  content: "\2192"; position: absolute; left: calc(var(--space-3) * -1); top: 50%; transform: translateY(-50%);
   width: var(--space-5); text-align: center; background: var(--bg); color: var(--text-muted);
   font-family: var(--font-data); font-size: var(--text-sm); line-height: var(--space-5);
   border: var(--border-width) solid var(--border); border-radius: var(--radius-sm);
@@ -259,11 +259,11 @@ tr.detail td { height: auto; padding: var(--space-3); background: var(--surface-
 .flow p { font-size: var(--text-sm); color: var(--text-muted); margin-top: var(--space-1); }
 .flow li.human { background: var(--surface-3); }
 .flow li.human h3 { color: var(--approve); }
-.flow .ends { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
+.flow .ends { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); margin-top: var(--space-2); }
 @media (max-width: 760px) {
   .flow { grid-template-columns: 1fr; }
   .flow li + li { border-left: 0; border-top: var(--border-width) solid var(--border); }
-  .flow li + li::after { content: "\2193"; left: var(--space-4); top: calc(var(--space-3) * -1); }
+  .flow li + li::after { content: "\2193"; left: var(--space-4); top: calc(var(--space-3) * -1); transform: none; }
 }
 
 .layers { display: grid; grid-template-columns: 1fr 1fr; border-top: var(--border-width) solid var(--border); }
