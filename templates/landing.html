@@ -1,16 +1,7 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Signal Sentinel — self-updating threat intelligence</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
-</head>
-<body class="landing-body">
+{% extends "base.html" %}
+{% block title %}Signal Sentinel{% endblock %}
+{% block body_class %}landing-body{% endblock %}
+{% block content %}
   <div class="grain-overlay"></div>
   <div class="cursor-glow" id="cursor-glow"></div>
 
@@ -174,7 +165,5 @@
   </section>
 
   <footer class="l-footer">Signal Sentinel — a self-updating threat-intelligence agent, built for a hackathon demo.</footer>
-
-  <script src="{{ url_for('static', filename='js/landing.js') }}"></script>
-</body>
-</html>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/landing.js') }}"></script>{% endblock %}

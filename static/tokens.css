@@ -75,6 +75,12 @@
   --rail-width: 13.5rem;
   --content-max: 80rem;
   --row-height: 2.25rem;  /* dense table rows */
+
+  /* Added during the UI redesign (values the original set lacked) */
+  --tap-min:       2.75rem;                 /* 44px minimum touch target */
+  --border-accent: 2px;                     /* active-rail / emphasis edge, matches .rail */
+  --approve-bg:    rgb(79 181 131 / 0.12);  /* hover fill for .btn-approve */
+  --reject-bg:     rgb(224 103 95 / 0.12);  /* hover fill for .btn-reject */
 }
 
 /* ---------- Base ---------- */
