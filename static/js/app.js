@@ -653,35 +653,62 @@ document.getElementById("feed-filter").addEventListener("click", e => {
   renderIntelTable();
 });
 
-// ---------------- Scam Shield tab ----------------
+// ---------------- Customer Shield ----------------
+const RISK_VERDICT = { high: "blocked", medium: "suspicious", low: "allowed" };
+const LINK_VERDICT = { blocked: "blocked", warning: "suspicious", allowed: "allowed" };
+
+function verdictTag(v) {
+  return `<span class="tag tag-${v}">${v}</span>`;
+}
+
+function linksCell(links) {
+  if (!links || !links.length) return '<span class="muted">No links</span>';
+  return links.map(l => `<span class="nowrap">${verdictTag(LINK_VERDICT[l.verdict] || "allowed")} <span class="data">${escapeHtml(l.host)}</span></span>`).join("<br>");
+}
+
 async function loadTrending() {
-  const res = await fetch("/api/scam-patterns");
-  const patterns = await res.json();
-  document.getElementById("trending-list").innerHTML = patterns.map(p => `
-    <div class="trend-card">
-      <div class="t-name">${p.status === "pending" ? "🆕 " : ""}${escapeHtml(p.name)}</div>
-      <div class="t-desc">${escapeHtml(p.description)}</div>
-      <div class="t-source">${escapeHtml(p.source)}</div>
-    </div>`).join("");
+  const body = document.getElementById("trending-list");
+  try {
+    const patterns = await getJson("/api/scam-patterns");
+    document.getElementById("trending-count").textContent = `(${patterns.length})`;
+    body.innerHTML = patterns.length ? patterns.map(p => `
+      <tr>
+        <td class="top wrap">${escapeHtml(p.name)}<span class="cell-sub">${escapeHtml(p.source)}</span></td>
+        <td>${sevTag(p.severity)}</td>
+        <td>${statusTag(p.status)}</td>
+      </tr>`).join("") : '<tr><td colspan="3" class="state">No scam patterns loaded.</td></tr>';
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="3" class="state state-error">Could not load scam patterns.</td></tr>';
+  }
 }
 
 async function loadBlockedDomains() {
-  const res = await fetch("/api/blocked-domains");
-  const domains = await res.json();
-  document.getElementById("blocked-domains-list").innerHTML = domains.map(d => `
-    <div class="trend-card">
-      <div class="t-name">🚫 ${escapeHtml(d.domain)}</div>
-      <div class="t-desc">${escapeHtml(d.category)}</div>
-      <div class="t-source">${escapeHtml(d.source)}</div>
-    </div>`).join("");
+  const body = document.getElementById("blocked-domains-list");
+  try {
+    const domains = await getJson("/api/blocked-domains");
+    domains.sort((a, b) => String(b.date_added).localeCompare(String(a.date_added)));
+    document.getElementById("blocked-count").textContent = `(${domains.length})`;
+    body.innerHTML = domains.length ? domains.map(d => `
+      <tr>
+        <td class="data break">${escapeHtml(d.domain)}</td>
+        <td>${sevTag(d.severity)}</td>
+        <td class="wrap">${escapeHtml(d.category)}</td>
+        <td class="wrap"><span class="cell-sub">${escapeHtml(d.source)}</span></td>
+        <td class="data nowrap">${escapeHtml(d.date_added)}</td>
+      </tr>`).join("") : '<tr><td colspan="5" class="state">No domains are blocked yet. Approve a domain rule in AI Security Agent.</td></tr>';
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="5" class="state state-error">Could not load the blocklist.</td></tr>';
+  }
 }
 
-// ---------------- Live inbox feed (automatic, no paste needed) ----------------
+// Simulated arrivals, scored by the real engine. Polls only while the section is open.
 let inboxTimer = null;
-const MAX_INBOX_MESSAGES = 6;
+let inboxPaused = false;
+let inboxFailures = 0;
+const MAX_INBOX_MESSAGES = 8;
 
 function startInboxFeed() {
-  if (inboxTimer) return;
+  if (inboxTimer || inboxPaused) return;
   addIncomingMessage();
   inboxTimer = setInterval(addIncomingMessage, 4500);
 }
@@ -691,129 +718,102 @@ function stopInboxFeed() {
   inboxTimer = null;
 }
 
+document.getElementById("feed-toggle").addEventListener("click", () => {
+  const btn = document.getElementById("feed-toggle");
+  inboxPaused = !inboxPaused;
+  btn.setAttribute("aria-pressed", String(inboxPaused));
+  btn.textContent = inboxPaused ? "Resume feed" : "Pause feed";
+  if (inboxPaused) stopInboxFeed(); else startInboxFeed();
+});
+
 async function addIncomingMessage() {
   const feed = document.getElementById("inbox-feed");
-  if (!feed) return;
-  const res = await fetch("/api/inbox/next");
-  const msg = await res.json();
-
-  const el = document.createElement("div");
-  el.className = "inbox-msg";
-  el.dataset.id = msg.id;
-  el.innerHTML = `
-    <div class="inbox-msg-top">
-      <span class="inbox-sender">${escapeHtml(msg.sender)}</span>
-      <span class="inbox-time">${msg.arrived_at}</span>
-    </div>
-    <div class="inbox-text">${escapeHtml(msg.text)}</div>
-    <div class="inbox-badge scanning"><span class="dot">◐</span> Scanning…</div>
-  `;
-  feed.insertBefore(el, feed.firstChild);
-  while (feed.children.length > MAX_INBOX_MESSAGES) {
-    feed.removeChild(feed.lastChild);
+  let msg;
+  try {
+    msg = await getJson("/api/inbox/next");
+    inboxFailures = 0;
+  } catch (e) {
+    inboxFailures += 1;
+    if (inboxFailures >= 2 || !feed.querySelector("tr[data-id]")) {
+      feed.querySelectorAll("tr:not([data-id])").forEach(r => r.remove());
+      feed.insertAdjacentHTML("afterbegin", '<tr><td colspan="7" class="state state-error">Could not reach the server for new messages. Retrying.</td></tr>');
+    }
+    return;
   }
-
-  setTimeout(() => revealVerdict(el, msg), 700);
+  feed.querySelectorAll("tr:not([data-id])").forEach(r => r.remove());
+  const v = RISK_VERDICT[msg.risk] || "allowed";
+  const row = document.createElement("tr");
+  row.dataset.id = msg.id;
+  row.innerHTML = `
+    <td class="data nowrap">${escapeHtml(msg.arrived_at)}</td>
+    <td class="nowrap">${escapeHtml(msg.sender)}</td>
+    <td class="top wrap">${escapeHtml(msg.text)}</td>
+    <td class="num">${escapeHtml(msg.score)}</td>
+    <td>${verdictTag(v)}</td>
+    <td class="top">${linksCell(msg.links_checked)}</td>
+    <td class="top wrap"><span class="cell-sub">${escapeHtml((msg.reasons || [])[0] || "")}</span></td>`;
+  feed.insertBefore(row, feed.firstChild);
+  while (feed.children.length > MAX_INBOX_MESSAGES) feed.removeChild(feed.lastChild);
 }
 
-function revealVerdict(el, msg) {
-  const badge = el.querySelector(".inbox-badge");
-  if (msg.risk === "high") {
-    el.classList.add("flagged");
-    badge.className = "inbox-badge flagged";
-    badge.textContent = `⚠ Flagged — ${msg.score}% likely scam`;
-    el.appendChild(buildInboxExpand(msg));
-    el.addEventListener("click", () => el.classList.toggle("open"));
-  } else if (msg.risk === "medium") {
-    el.classList.add("caution");
-    badge.className = "inbox-badge caution";
-    badge.textContent = `⚠ Caution — ${msg.score}%`;
-    el.appendChild(buildInboxExpand(msg));
-    el.addEventListener("click", () => el.classList.toggle("open"));
-  } else {
-    badge.remove();
-  }
-}
-
-function buildInboxExpand(msg) {
-  const wrap = document.createElement("div");
-  wrap.className = "inbox-expand";
-  const linkRows = (msg.links_checked || []).map(l => `
-    <div class="link-row ${l.verdict}">
-      <span class="host">🔗 ${escapeHtml(l.host)}</span>
-      <span class="verdict-tag">${{ blocked: "🚫 Blocked", warning: "⚠ Caution", allowed: "✓ Clean" }[l.verdict]}</span>
-    </div>`).join("");
-  wrap.innerHTML = `
-    <ul class="reasons-list">${msg.reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
-    ${linkRows}
-  `;
-  return wrap;
-}
-
-document.getElementById("manual-toggle-btn").addEventListener("click", () => {
-  const panel = document.getElementById("manual-panel");
-  panel.classList.toggle("hidden");
-  document.getElementById("manual-toggle-btn").textContent = panel.classList.contains("hidden")
-    ? "✍️ Test a message by hand ▾" : "✍️ Test a message by hand ▴";
-});
-
-document.getElementById("scam-check-btn").addEventListener("click", async () => {
-  const text = document.getElementById("scam-input").value.trim();
-  if (!text) return;
-  const res = await fetch("/api/scam-check", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text })
-  });
-  const result = await res.json();
-  showScamResult(result);
-});
-
-function showScamResult(result) {
+document.getElementById("scam-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = document.getElementById("scam-check-btn");
   const box = document.getElementById("scam-result");
-  box.classList.remove("hidden");
-  document.getElementById("recovery-box").classList.add("hidden");
-
-  const colors = { high: "var(--critical)", medium: "var(--high)", low: "var(--green)" };
-  const color = colors[result.risk];
-  const ring = document.getElementById("risk-ring");
-  ring.style.background = `conic-gradient(${color} ${result.score * 3.6}deg, var(--panel-border) 0deg)`;
-  document.getElementById("risk-score").textContent = result.score + "%";
-  document.getElementById("risk-score").style.color = color;
-
-  const label = document.getElementById("risk-label");
-  label.textContent = result.risk === "high" ? "High risk — likely a scam"
-    : result.risk === "medium" ? "Medium risk — be cautious" : "Low risk — looks legitimate";
-  label.style.color = color;
-
-  document.getElementById("scam-reasons").innerHTML = result.reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("");
-
-  const linksBox = document.getElementById("links-checked-box");
-  if (result.links_checked && result.links_checked.length) {
-    const tags = { blocked: "🚫 Blocked", warning: "⚠ Caution", allowed: "✓ Clean" };
-    linksBox.innerHTML = result.links_checked.map(l => `
-      <div class="link-row ${l.verdict}">
-        <span class="host">🔗 ${escapeHtml(l.host)}</span>
-        <span class="verdict-tag">${tags[l.verdict]}</span>
-      </div>`).join("");
-    linksBox.classList.remove("hidden");
-  } else {
-    linksBox.classList.add("hidden");
+  const text = document.getElementById("scam-input").value.trim();
+  if (!text) {
+    box.hidden = false;
+    box.innerHTML = '<p class="state-error">Paste a message or link first.</p>';
+    return;
   }
+  setBusy(btn, true, "Checking");
+  try {
+    const result = await getJson("/api/scam-check", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text })
+    });
+    showScamResult(result);
+  } catch (err) {
+    box.hidden = false;
+    box.innerHTML = '<p class="state-error">Could not check the message: the server did not respond.</p>';
+  }
+  setBusy(btn, false, "Check message");
+});
+
+function showScamResult(r) {
+  const box = document.getElementById("scam-result");
+  const v = RISK_VERDICT[r.risk] || "allowed";
+  const meaning = { blocked: "Likely a scam.", suspicious: "Be cautious.", allowed: "No strong scam signals." }[v];
+  const links = (r.links_checked || []).length ? `
+    <div class="table-wrap fit block">
+      <table>
+        <thead><tr><th scope="col">Domain</th><th scope="col">Verdict</th><th scope="col">Score</th></tr></thead>
+        <tbody>${r.links_checked.map(l => `<tr><td class="data break">${escapeHtml(l.host)}</td><td>${verdictTag(LINK_VERDICT[l.verdict] || "allowed")}</td><td class="num">${escapeHtml(l.score)}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>` : '<p class="muted block">No links found in this message.</p>';
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="result-head">${verdictTag(v)} <span class="result-score">${escapeHtml(r.score)}</span><span class="muted">risk score out of 99. ${meaning}</span></div>
+    <ul class="reasons">${(r.reasons || []).map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+    ${links}
+    <div class="block"><button type="button" class="btn" id="btn-already-clicked">The customer already clicked</button></div>
+    <div id="recovery-box" aria-live="polite"></div>`;
+  document.getElementById("btn-already-clicked").addEventListener("click", loadRecovery);
 }
 
-document.getElementById("btn-already-clicked").addEventListener("click", async () => {
-  const res = await fetch("/api/recovery");
-  const steps = await res.json();
+async function loadRecovery() {
+  const btn = document.getElementById("btn-already-clicked");
   const box = document.getElementById("recovery-box");
-  box.classList.remove("hidden");
-  box.innerHTML = "<h4>Recovery checklist</h4>" + steps.map(s => `
-    <div class="recovery-step">${escapeHtml(s.step)}<span class="detail">${escapeHtml(s.detail)}</span></div>`).join("");
-});
-
-document.getElementById("btn-block-report").addEventListener("click", () => {
-  const btn = document.getElementById("btn-block-report");
-  btn.textContent = "✓ Reported";
-  btn.disabled = true;
-});
+  setBusy(btn, true, "Loading checklist");
+  try {
+    const steps = await getJson("/api/recovery");
+    box.innerHTML = '<h3 class="block">Recovery checklist</h3><ol class="recovery">' +
+      steps.map(s => `<li>${escapeHtml(s.step)}<span>${escapeHtml(s.detail)}</span></li>`).join("") + "</ol>";
+    btn.hidden = true;
+  } catch (e) {
+    box.innerHTML = '<p class="state-error">Could not load the recovery checklist.</p>';
+    setBusy(btn, false, "The customer already clicked");
+  }
+}
 
 // ---------------- Metrics tab ----------------
 async function loadMetrics() {

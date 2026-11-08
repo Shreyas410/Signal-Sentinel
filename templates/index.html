@@ -144,56 +144,67 @@
         </section>
       </section>
 
-      <!-- ===================== SCAM SHIELD TAB ===================== -->
-      <section class="app-section" id="shield" aria-label="Customer Shield" hidden>
-        <div class="panel-head">
+      <section class="app-section" id="shield" aria-labelledby="shield-h" hidden>
+        <header class="page-head">
           <div>
-            <h1>Customer Scam Shield</h1>
-            <p class="muted">Before, during and after a threat — inside your app.</p>
+            <h1 id="shield-h">Customer Shield</h1>
+            <p>Scores each incoming customer message and every link inside it, using the domain rules approved in AI Security Agent.</p>
           </div>
-        </div>
+        </header>
+        <p class="note">The link firewall checks each link's destination domain only. It never reads the message content, so it works the same for SMS, email or encrypted chat. Wording is scored separately, in memory, and nothing is stored.</p>
 
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">Trending this week</div>
-            <div id="trending-list" class="trending-list"></div>
-          </div>
-
-          <div class="phone-mock">
-            <div class="phone-notch"></div>
-            <div class="phone-screen">
-              <div class="phone-header">Live Message Shield</div>
-              <p class="firewall-intro">Every message is checked automatically the instant it arrives — the wording, and any link inside it.</p>
-
-              <div id="inbox-feed" class="inbox-feed"></div>
-
-              <button class="manual-toggle" id="manual-toggle-btn">✍️ Test a message by hand ▾</button>
-              <div class="manual-panel hidden" id="manual-panel">
-                <textarea id="scam-input" placeholder="Paste a suspicious text message or link here...">USPS: Your package could not be delivered. Pay a $1.99 redelivery fee within 24 hours at http://usps-redelivery.top/track</textarea>
-                <button class="btn btn-primary full" id="scam-check-btn">Check this message</button>
-
-                <div id="scam-result" class="scam-result hidden">
-                  <div class="risk-gauge">
-                    <div class="risk-ring" id="risk-ring"><span id="risk-score">0%</span></div>
-                    <div class="risk-label" id="risk-label">—</div>
-                  </div>
-                  <ul id="scam-reasons" class="reasons-list"></ul>
-                  <div id="links-checked-box" class="links-checked-box hidden"></div>
-                  <div class="scam-actions">
-                    <button class="btn btn-danger" id="btn-already-clicked">I already clicked →</button>
-                    <button class="btn btn-ghost" id="btn-block-report">Block &amp; report</button>
-                  </div>
-                  <div id="recovery-box" class="recovery-box hidden"></div>
-                </div>
-              </div>
+        <section class="block" aria-labelledby="live-h">
+          <div class="block-head">
+            <div>
+              <h2 id="live-h">Incoming messages</h2>
+              <p>Simulated arrivals from a local sample pool, scored live by the real engine as each one arrives.</p>
             </div>
+            <button type="button" class="btn" id="feed-toggle" aria-pressed="false">Pause feed</button>
           </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Arrived</th><th scope="col">From</th><th scope="col" class="wrap">Message</th><th scope="col">Score</th><th scope="col">Verdict</th><th scope="col">Links checked</th><th scope="col" class="wrap">Main reason</th></tr></thead>
+              <tbody id="inbox-feed"><tr><td colspan="7" class="state">Waiting for the first message&hellip;</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="split block">
+          <section aria-labelledby="manual-h">
+            <div class="block-head"><h2 id="manual-h">Check a message by hand</h2></div>
+            <div class="panel panel-pad">
+              <form class="check-form" id="scam-form">
+                <label class="label" for="scam-input">Message text or link</label>
+                <textarea id="scam-input" placeholder="Paste a suspicious text message or link">USPS: Your package could not be delivered. Pay a $1.99 redelivery fee within 24 hours at http://usps-redelivery.top/track</textarea>
+                <div><button class="btn btn-primary" id="scam-check-btn" type="submit">Check message</button></div>
+              </form>
+              <div id="scam-result" class="block" aria-live="polite" hidden></div>
+            </div>
+          </section>
+
+          <section aria-labelledby="trend-h">
+            <div class="block-head"><h2 id="trend-h">Known scam patterns <span class="count" id="trending-count"></span></h2></div>
+            <div class="table-wrap fit">
+              <table>
+                <thead><tr><th scope="col">Pattern</th><th scope="col">Severity</th><th scope="col">Status</th></tr></thead>
+                <tbody id="trending-list"><tr><td colspan="3" class="state">Loading&hellip;</td></tr></tbody>
+              </table>
+            </div>
+          </section>
         </div>
 
-        <div class="card">
-          <div class="card-title">🌐 Recently blocked across the network</div>
-          <div id="blocked-domains-list" class="trending-list"></div>
-        </div>
+        <section class="block" aria-labelledby="blocked-h">
+          <div class="block-head">
+            <h2 id="blocked-h">Blocked domains <span class="count" id="blocked-count"></span></h2>
+            <p>Approved domain rules. Links to these domains or their subdomains are blocked for every customer.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Domain</th><th scope="col">Severity</th><th scope="col" class="wrap">Scam type</th><th scope="col" class="wrap">Source</th><th scope="col">Added</th></tr></thead>
+              <tbody id="blocked-domains-list"><tr><td colspan="5" class="state">Loading&hellip;</td></tr></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <!-- ===================== METRICS TAB ===================== -->
