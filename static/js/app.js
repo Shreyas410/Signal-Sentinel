@@ -815,22 +815,49 @@ async function loadRecovery() {
   }
 }
 
-// ---------------- Metrics tab ----------------
+// ---------------- Metrics ----------------
 async function loadMetrics() {
-  const res = await fetch("/api/metrics");
-  if (!res.ok) return;
-  const m = await res.json();
-  document.getElementById("metrics-grid").innerHTML = `
-    <div class="metric-tile"><div class="val">${(m.precision * 100).toFixed(1)}%</div><div class="lab">Precision</div></div>
-    <div class="metric-tile"><div class="val">${(m.recall * 100).toFixed(1)}%</div><div class="lab">Recall</div></div>
-    <div class="metric-tile"><div class="val">${(m.f1 * 100).toFixed(1)}%</div><div class="lab">F1 Score</div></div>
-    <div class="metric-tile"><div class="val">${m.dataset_size}</div><div class="lab">Messages tested</div></div>
-  `;
-  document.getElementById("confusion-table").innerHTML = `
-    <tr><th></th><th>Predicted Scam</th><th>Predicted Legit</th></tr>
-    <tr><th>Actual Scam</th><td>${m.true_positive}</td><td>${m.false_negative}</td></tr>
-    <tr><th>Actual Legit</th><td>${m.false_positive}</td><td>${m.true_negative}</td></tr>
-  `;
+  const el = document.getElementById("metrics-body");
+  let m;
+  try {
+    const res = await fetch("/api/metrics");
+    if (res.status === 404) {
+      el.innerHTML = '<p class="panel state"><strong>No metrics have been generated yet.</strong> Run <code>python generate_dataset.py</code> to score the test set, then reload this page.</p>';
+      return;
+    }
+    if (!res.ok) throw new Error(res.status);
+    m = await res.json();
+  } catch (e) {
+    el.innerHTML = '<p class="panel state state-error"><strong>Could not load metrics.</strong> The server did not respond.</p>';
+    return;
+  }
+  const pct = x => (x * 100).toFixed(1) + "%";
+  const scam = m.true_positive + m.false_negative;
+  const legit = m.true_negative + m.false_positive;
+  const bar = (n, d) => `<span class="bar" aria-hidden="true"><span style="width:${d ? (n / d * 100).toFixed(1) : 0}%"></span></span>`;
+  el.innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="stat-value">${pct(m.precision)}</div><div class="stat-label label">Precision</div><div class="stat-sub">Of messages flagged, the share that were scams</div></div>
+      <div class="stat"><div class="stat-value">${pct(m.recall)}</div><div class="stat-label label">Recall</div><div class="stat-sub">Of scam messages, the share that were flagged</div></div>
+      <div class="stat"><div class="stat-value">${pct(m.f1)}</div><div class="stat-label label">F1 score</div><div class="stat-sub">Balance of precision and recall</div></div>
+    </div>
+
+    <section class="block" aria-labelledby="counts-h">
+      <div class="block-head">
+        <h2 id="counts-h">Underlying counts</h2>
+        <p>${m.dataset_size} messages. A message counts as flagged when its verdict is SUSPICIOUS or BLOCKED.</p>
+      </div>
+      <div class="table-wrap fit">
+        <table>
+          <thead><tr><th scope="col">Actual label</th><th scope="col">Flagged</th><th scope="col">Not flagged</th><th scope="col">Total</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Scam</th><td class="num top">${m.true_positive} correct${bar(m.true_positive, scam)}</td><td class="num top">${m.false_negative} missed${bar(m.false_negative, scam)}</td><td class="num">${scam}</td></tr>
+            <tr><th scope="row">Legitimate</th><td class="num top">${m.false_positive} false alarms${bar(m.false_positive, legit)}</td><td class="num top">${m.true_negative} correct${bar(m.true_negative, legit)}</td><td class="num">${legit}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note block">The test set is synthetic: ${m.dataset_size} messages generated from 24 hand-written templates, so these figures show the engine works on known scam shapes rather than predicting real-world accuracy. Overall accuracy: ${pct(m.accuracy)}.</p>
+    </section>`;
 }
 
 // ---------------- Boot: show the section named in the URL ----------------

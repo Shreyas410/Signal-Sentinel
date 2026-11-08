@@ -208,18 +208,14 @@
       </section>
 
       <!-- ===================== METRICS TAB ===================== -->
-      <section class="app-section" id="metrics" aria-label="Metrics" hidden>
-        <div class="panel-head">
+      <section class="app-section" id="metrics" aria-labelledby="metrics-h" hidden>
+        <header class="page-head">
           <div>
-            <h1>Detection Metrics</h1>
-            <p class="muted">Scored against a synthetic dataset of scam and legitimate messages.</p>
+            <h1 id="metrics-h">Metrics</h1>
+            <p>How well the Customer Shield separates scam from legitimate messages on the project's labelled test set.</p>
           </div>
-        </div>
-        <div class="grid-4" id="metrics-grid"></div>
-        <div class="card">
-          <div class="card-title">Confusion matrix</div>
-          <table class="confusion-table" id="confusion-table"></table>
-        </div>
+        </header>
+        <div id="metrics-body" aria-live="polite"><p class="panel state">Loading metrics&hellip;</p></div>
       </section>
     </main>
   </div>
