@@ -269,7 +269,7 @@
     "source_cve": "CVE-2024-27834",
     "source_url": "https://nvd.nist.gov/vuln/detail/CVE-2024-27834",
     "date_added": "2026-11-07",
-    "status": "pending",
+    "status": "approved",
     "auto_detectable": true,
     "example_vulnerable": "if token == ADMIN_TOKEN:\n    grant_access()",
     "example_fixed": "if hmac.compare_digest(token, ADMIN_TOKEN):\n    grant_access()"

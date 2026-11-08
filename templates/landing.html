@@ -15,27 +15,50 @@
       <p class="live-line" id="live-line" aria-live="polite">Loading current rule counts&hellip;</p>
     </section>
 
-    <section aria-labelledby="flow-h">
-      <h2 id="flow-h">How a rule gets enforced</h2>
-      <ol class="flow">
-        <li>
-          <h3>Public threat feeds</h3>
-          <p>The CISA Known Exploited Vulnerabilities catalog and the OpenPhish community feed, fetched on demand. If the network is down, the last local copy is used and the console says so.</p>
-        </li>
-        <li>
-          <h3>Rule drafted</h3>
-          <p>A newly exploited CVE in a weakness class the scanner can express as a pattern becomes a draft code rule. A newly reported phishing URL becomes a draft domain block.</p>
-        </li>
-        <li class="human">
-          <h3>Analyst approves</h3>
-          <p>Nothing is enforced until a person reads the rule, the feed entry behind it and what it would match, then clicks Approve and Confirm.</p>
-        </li>
-        <li>
-          <h3>Enforced</h3>
-          <p>Code rules go to the Dev/CI scanner. Domain rules go to the Customer Shield link firewall.</p>
-          <div class="ends"><span class="tag tag-where">Dev/CI scanner</span><span class="tag tag-where">Customer Shield</span></div>
-        </li>
-      </ol>
+    <section aria-labelledby="pile-h">
+      <h2 id="pile-h">AI ships code fast. Some of it is vulnerable.</h2>
+      <div class="pile-demo" aria-hidden="true">
+        <div class="pile-col">
+          <div class="pile-track">
+            <div class="pile-line">def checkout(request):</div>
+            <div class="pile-line">cart_id = request.args.get("id")</div>
+            <div class="pile-line flagged sev-critical-line">q = "SELECT * FROM carts WHERE id=" + cart_id<span class="sev sev-critical">critical</span></div>
+            <div class="pile-line">total = calculate(cart_id)</div>
+            <div class="pile-line">token = req.headers.get("X-Admin-Token")</div>
+            <div class="pile-line flagged">if token == ADMIN_TOKEN:<span class="sev sev-high">high</span></div>
+            <div class="pile-line">return jsonify({"ok": True})</div>
+            <div class="pile-line">key = os.environ.get("STRIPE_KEY")</div>
+            <div class="pile-line flagged">session = pickle.loads(blob)<span class="sev sev-high">high</span></div>
+            <div class="pile-line">resp = requests.get(url, timeout=5)</div>
+            <div class="pile-line">output = subprocess.run(cmd, shell=True)</div>
+            <div class="pile-line flagged sev-critical-line">os.system("rm -rf " + path)<span class="sev sev-critical">critical</span></div>
+            <div class="pile-line">return render(template, ctx)</div>
+            <div class="pile-line">log.info("request handled")</div>
+            <!-- duplicated for a seamless loop -->
+            <div class="pile-line">def checkout(request):</div>
+            <div class="pile-line">cart_id = request.args.get("id")</div>
+            <div class="pile-line flagged sev-critical-line">q = "SELECT * FROM carts WHERE id=" + cart_id<span class="sev sev-critical">critical</span></div>
+            <div class="pile-line">total = calculate(cart_id)</div>
+            <div class="pile-line">token = req.headers.get("X-Admin-Token")</div>
+            <div class="pile-line flagged">if token == ADMIN_TOKEN:<span class="sev sev-high">high</span></div>
+            <div class="pile-line">return jsonify({"ok": True})</div>
+            <div class="pile-line">key = os.environ.get("STRIPE_KEY")</div>
+            <div class="pile-line flagged">session = pickle.loads(blob)<span class="sev sev-high">high</span></div>
+            <div class="pile-line">resp = requests.get(url, timeout=5)</div>
+            <div class="pile-line">output = subprocess.run(cmd, shell=True)</div>
+            <div class="pile-line flagged sev-critical-line">os.system("rm -rf " + path)<span class="sev sev-critical">critical</span></div>
+            <div class="pile-line">return render(template, ctx)</div>
+            <div class="pile-line">log.info("request handled")</div>
+          </div>
+        </div>
+        <div class="pile-caught">
+          <span class="label">Caught mid-stream</span>
+          <span class="sev sev-critical">critical</span>
+          <p>CWE-89 SQL injection &mdash; string-built query, same shape as a pattern drafted from the live CISA KEV feed.</p>
+          <span class="tag tag-where">pipeline blocked</span>
+        </div>
+      </div>
+      <p class="pile-caption">Every highlighted line matches a rule drafted from CISA KEV or OpenPhish. Nothing above is enforced until an analyst approves it in the console.</p>
     </section>
 
     <section aria-labelledby="layers-h">
@@ -44,21 +67,17 @@
         <section aria-labelledby="l1-h">
           <span class="label">Layer 1 &middot; Dev/CI pipeline</span>
           <h3 id="l1-h">Before code ships</h3>
-          <p>Scans every <code>.py</code>, <code>.js</code> and <code>.ts</code> file in a repository against the enforced code rules, and checks <code>requirements.txt</code> pins against known-vulnerable versions.</p>
+          <p>Scans every <code>.py</code>, <code>.js</code> and <code>.ts</code> file against the enforced code rules.</p>
           <ul>
-            <li>Each finding shows its severity, file, line and the code that matched.</li>
             <li>Verified one-click fixes rewrite the line only if the file still matches what was scanned.</li>
-            <li>The demo runs against two intentionally vulnerable repositories: <code>core-customer-api</code> and <code>payments-service</code>.</li>
           </ul>
         </section>
         <section aria-labelledby="l2-h">
           <span class="label">Layer 2 &middot; Customer-facing app</span>
           <h3 id="l2-h">When a message arrives</h3>
-          <p>Scores the wording of an incoming message and every link inside it. Links are checked against the enforced domain blocklist, lookalike brand names and high-risk domain endings.</p>
+          <p>Scores the wording of an incoming message and every link inside it against the enforced domain blocklist.</p>
           <ul>
-            <li>The link check reads the destination domain only, never the message content, so it works the same for SMS, email or encrypted chat.</li>
-            <li>Every link gets a plain verdict: BLOCKED, SUSPICIOUS or ALLOWED, with the reason.</li>
-            <li>Customers who already clicked get a recovery checklist.</li>
+            <li>The link check reads the destination domain only, never the message content &mdash; works the same for SMS, email or encrypted chat.</li>
           </ul>
         </section>
       </div>
@@ -68,9 +87,7 @@
       <dt>Live</dt>
       <dd>The CISA KEV and OpenPhish fetches, rule drafting, the code scan and the link scoring.</dd>
       <dt>Simulated for the demo</dt>
-      <dd>The incoming-message feed in Customer Shield draws from a local sample pool. Domain age is a deterministic stand-in for a WHOIS lookup. Accuracy figures come from a 260-message synthetic test set.</dd>
-      <dt>Data</dt>
-      <dd>No real customer data is used anywhere.</dd>
+      <dd>The incoming-message feed in Customer Shield draws from a local sample pool, and domain age stands in for a WHOIS lookup. Accuracy figures come from a 260-message synthetic test set. No real customer data is used anywhere.</dd>
     </dl>
   </main>
 </div>

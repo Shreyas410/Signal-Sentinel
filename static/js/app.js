@@ -1,5 +1,5 @@
 // ---------------- Shell: rail navigation (hash-based) ----------------
-const SECTIONS = ["agent", "intel", "shield", "metrics"];
+const SECTIONS = ["agent", "scan", "intel", "shield"];
 
 function showSection(id, focus) {
   if (!SECTIONS.includes(id)) id = "agent";
@@ -11,7 +11,6 @@ function showSection(id, focus) {
   if (id === "intel") loadThreatIntel();
   if (id === "shield") { loadTrending(); loadBlockedDomains(); startInboxFeed(); }
   else { stopInboxFeed(); }
-  if (id === "metrics") loadMetrics();
   if (focus) document.getElementById("main").focus({ preventScroll: true });
   window.scrollTo(0, 0);
 }
@@ -117,7 +116,7 @@ function renderQueue() {
   document.getElementById("queue-count").textContent = items.length ? `(${items.length})` : "";
   document.getElementById("rail-pending").textContent = items.length ? items.length : "";
   if (!items.length) {
-    queue.innerHTML = '<li class="panel state"><strong>No rules are waiting for approval.</strong> Sync the feeds in <a href="#intel">Threat Intel</a> to draft rules for newly reported attacks.</li>';
+    queue.innerHTML = '<li class="panel state"><strong>No rules are waiting for approval.</strong> Click “Check for new vulnerabilities” above to draft rules for newly reported attacks.</li>';
     return;
   }
   const code = items.filter(it => it.kind === "code");
@@ -546,7 +545,7 @@ document.getElementById("sync-btn").addEventListener("click", async () => {
     statusEl.textContent = "Sync failed: the server did not respond. Existing rules are unchanged.";
     statusEl.classList.add("state-error");
   }
-  setBusy(btn, false, "Sync feeds now");
+  setBusy(btn, false, "Check for new vulnerabilities");
   await loadThreatIntel();
   loadFeedStatus();
 });
@@ -555,7 +554,7 @@ document.getElementById("sync-btn").addEventListener("click", async () => {
 // ---------------- Threat Intel: feed status table + entries table ----------------
 function feedMetaRow(name, meta, unit) {
   if (!meta || !meta.last_synced_at) {
-    return `<tr><th scope="row">${name}</th><td><span class="tag tag-pending">not synced</span></td><td colspan="3" class="muted">No sync has run yet. Click Sync feeds now.</td></tr>`;
+    return `<tr><th scope="row">${name}</th><td><span class="tag tag-pending">not synced</span></td><td colspan="3" class="muted">No sync has run yet. Click Check for new vulnerabilities.</td></tr>`;
   }
   const live = meta.source === "live";
   const status = live
@@ -617,7 +616,7 @@ function renderIntelTable() {
   rows.sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || a.entryText.localeCompare(b.entryText); });
   document.getElementById("entries-count").textContent = intelFeed === "all" ? `(${total})` : `(${rows.length} of ${total})`;
   if (!total) {
-    body.innerHTML = '<tr><td colspan="6" class="state">No intel entries yet. Click Sync feeds now to read the public feeds.</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="state">No intel entries yet. Click Check for new vulnerabilities in <a href="#agent">New Vulnerabilities</a> to read the public feeds.</td></tr>';
     return;
   }
   if (!rows.length) {
@@ -705,7 +704,7 @@ async function loadBlockedDomains() {
         <td class="wrap">${escapeHtml(d.category)}</td>
         <td class="wrap"><span class="cell-sub">${escapeHtml(d.source)}</span></td>
         <td class="data nowrap">${escapeHtml(d.date_added)}</td>
-      </tr>`).join("") : '<tr><td colspan="5" class="state">No domains are blocked yet. Approve a domain rule in AI Security Agent.</td></tr>';
+      </tr>`).join("") : '<tr><td colspan="5" class="state">No domains are blocked yet. Approve a domain rule in New Vulnerabilities.</td></tr>';
   } catch (e) {
     body.innerHTML = '<tr><td colspan="5" class="state state-error">Could not load the blocklist.</td></tr>';
   }
@@ -823,51 +822,6 @@ async function loadRecovery() {
     box.innerHTML = '<p class="state-error">Could not load the recovery checklist.</p>';
     setBusy(btn, false, "The customer already clicked");
   }
-}
-
-// ---------------- Metrics ----------------
-async function loadMetrics() {
-  const el = document.getElementById("metrics-body");
-  let m;
-  try {
-    const res = await fetch("/api/metrics");
-    if (res.status === 404) {
-      el.innerHTML = '<p class="panel state"><strong>No metrics have been generated yet.</strong> Run <code>python generate_dataset.py</code> to score the test set, then reload this page.</p>';
-      return;
-    }
-    if (!res.ok) throw new Error(res.status);
-    m = await res.json();
-  } catch (e) {
-    el.innerHTML = '<p class="panel state state-error"><strong>Could not load metrics.</strong> The server did not respond.</p>';
-    return;
-  }
-  const pct = x => (x * 100).toFixed(1) + "%";
-  const scam = m.true_positive + m.false_negative;
-  const legit = m.true_negative + m.false_positive;
-  const bar = (n, d) => `<span class="bar" aria-hidden="true"><span style="width:${d ? (n / d * 100).toFixed(1) : 0}%"></span></span>`;
-  el.innerHTML = `
-    <div class="stats">
-      <div class="stat"><div class="stat-value">${pct(m.precision)}</div><div class="stat-label label">Precision</div><div class="stat-sub">Of messages flagged, the share that were scams</div></div>
-      <div class="stat"><div class="stat-value">${pct(m.recall)}</div><div class="stat-label label">Recall</div><div class="stat-sub">Of scam messages, the share that were flagged</div></div>
-      <div class="stat"><div class="stat-value">${pct(m.f1)}</div><div class="stat-label label">F1 score</div><div class="stat-sub">Balance of precision and recall</div></div>
-    </div>
-
-    <section class="block" aria-labelledby="counts-h">
-      <div class="block-head">
-        <h2 id="counts-h">Underlying counts</h2>
-        <p>${m.dataset_size} messages. A message counts as flagged when its verdict is SUSPICIOUS or BLOCKED.</p>
-      </div>
-      <div class="table-wrap fit">
-        <table>
-          <thead><tr><th scope="col">Actual label</th><th scope="col">Flagged</th><th scope="col">Not flagged</th><th scope="col">Total</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Scam</th><td class="num top">${m.true_positive} correct${bar(m.true_positive, scam)}</td><td class="num top">${m.false_negative} missed${bar(m.false_negative, scam)}</td><td class="num">${scam}</td></tr>
-            <tr><th scope="row">Legitimate</th><td class="num top">${m.false_positive} false alarms${bar(m.false_positive, legit)}</td><td class="num top">${m.true_negative} correct${bar(m.true_negative, legit)}</td><td class="num">${legit}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="note block">The test set is synthetic: ${m.dataset_size} messages generated from 24 hand-written templates, so these figures show the engine works on known scam shapes rather than predicting real-world accuracy. Overall accuracy: ${pct(m.accuracy)}.</p>
-    </section>`;
 }
 
 // In-page jump links (buttons, so they don't fight the section hash).

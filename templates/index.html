@@ -10,10 +10,10 @@
         <span class="label">Analyst console</span>
       </div>
       <nav id="rail-nav">
-        <a href="#agent" data-section="agent">AI Security Agent <span class="rail-count" id="rail-pending" title="Rules awaiting approval"></span></a>
+        <a href="#agent" data-section="agent">New Vulnerabilities <span class="rail-count" id="rail-pending" title="Rules awaiting approval"></span></a>
+        <a href="#scan" data-section="scan">Check Repository</a>
         <a href="#intel" data-section="intel">Threat Intel</a>
         <a href="#shield" data-section="shield">Customer Shield</a>
-        <a href="#metrics" data-section="metrics">Metrics</a>
       </nav>
       <div class="feed-status" aria-live="polite">
         <span class="label">Feed status</span>
@@ -28,16 +28,25 @@
       <section class="app-section" id="agent" aria-labelledby="agent-h">
         <header class="page-head">
           <div>
-            <h1 id="agent-h">AI Security Agent</h1>
-            <p>The agent drafts detection rules from the CISA KEV and OpenPhish feeds. A rule does nothing until an analyst approves it here. After approval it is enforced by the Dev/CI scanner or the Customer Shield link firewall.</p>
+            <h1 id="agent-h">New Vulnerabilities</h1>
+            <p>The agent drafts detection rules from the CISA KEV and OpenPhish feeds. Check for new ones below, then approve or reject each draft. Approved rules are enforced on the <a href="#scan">Check Repository</a> tab or by the Customer Shield link firewall.</p>
           </div>
+          <button class="btn btn-primary" id="sync-btn" type="button">Check for new vulnerabilities</button>
         </header>
+
+        <p class="note" id="sync-status" aria-live="polite">Reads both public feeds and drafts rules for anything new. If a feed cannot be reached, the last local copy is used.</p>
+
+        <div class="block table-wrap fit">
+          <table>
+            <thead><tr><th scope="col">Feed</th><th scope="col">Status</th><th scope="col">Last sync</th><th scope="col">Entries read</th><th scope="col">New drafts at last sync</th></tr></thead>
+            <tbody id="feed-meta-body"><tr><td colspan="5" class="state">Loading feed status&hellip;</td></tr></tbody>
+          </table>
+        </div>
 
         <nav class="jump" aria-label="On this page">
           <span class="label">Jump to</span>
           <button type="button" class="link-btn" data-jump="queue-h">Approval queue</button>
           <button type="button" class="link-btn" data-jump="enforced-h">Enforced</button>
-          <button type="button" class="link-btn" data-jump="scan-h">Dev/CI scan</button>
         </nav>
 
         <div class="notice" id="decision-notice" role="status" aria-live="polite"></div>
@@ -65,12 +74,21 @@
           </div>
           <button type="button" class="link-btn" id="enforced-more" aria-controls="enforced-body" hidden></button>
         </section>
+      </section>
+
+      <section class="app-section" id="scan" aria-labelledby="scan-page-h" hidden>
+        <header class="page-head">
+          <div>
+            <h1 id="scan-page-h">Check Repository</h1>
+            <p>Runs every enforced code rule against a repository and reports each match with its file and line.</p>
+          </div>
+        </header>
 
         <section class="block" aria-labelledby="scan-h">
           <div class="block-head">
             <div>
               <h2 id="scan-h">Dev/CI scan</h2>
-              <p>Runs every enforced code rule against a repository and reports each match with its file and line.</p>
+              <p>Pick a repository, then run the scan to see findings below.</p>
             </div>
             <div class="toolbar">
               <label class="sr-only" for="repo-select">Repository</label>
@@ -109,19 +127,9 @@
         <header class="page-head">
           <div>
             <h1 id="intel-h">Threat Intel</h1>
-            <p>Every entry the agent has drafted from the CISA KEV catalog and the OpenPhish feed, plus the hand-seeded starting rules. Drafts are approved or rejected in <a href="#agent">AI Security Agent</a>.</p>
+            <p>Every entry the agent has drafted from the CISA KEV catalog and the OpenPhish feed, plus the hand-seeded starting rules. Drafts are approved or rejected in <a href="#agent">New Vulnerabilities</a>.</p>
           </div>
-          <button class="btn btn-primary" id="sync-btn" type="button">Sync feeds now</button>
         </header>
-
-        <p class="note" id="sync-status" aria-live="polite">Sync reads both public feeds and drafts rules for anything new. If a feed cannot be reached, the last local copy is used.</p>
-
-        <div class="block table-wrap fit">
-          <table>
-            <thead><tr><th scope="col">Feed</th><th scope="col">Status</th><th scope="col">Last sync</th><th scope="col">Entries read</th><th scope="col">New drafts at last sync</th></tr></thead>
-            <tbody id="feed-meta-body"><tr><td colspan="5" class="state">Loading feed status&hellip;</td></tr></tbody>
-          </table>
-        </div>
 
         <section class="block" aria-labelledby="entries-h">
           <div class="block-head">
@@ -155,7 +163,7 @@
         <header class="page-head">
           <div>
             <h1 id="shield-h">Customer Shield</h1>
-            <p>Scores each incoming customer message and every link inside it, using the domain rules approved in AI Security Agent.</p>
+            <p>Scores each incoming customer message and every link inside it, using the domain rules approved in New Vulnerabilities.</p>
           </div>
         </header>
         <p class="note">The link firewall checks each link's destination domain only. It never reads the message content, so it works the same for SMS, email or encrypted chat. Wording is scored separately, in memory, and nothing is stored.</p>
@@ -214,16 +222,6 @@
         </section>
       </section>
 
-      <!-- ===================== METRICS TAB ===================== -->
-      <section class="app-section" id="metrics" aria-labelledby="metrics-h" hidden>
-        <header class="page-head">
-          <div>
-            <h1 id="metrics-h">Metrics</h1>
-            <p>How well the Customer Shield separates scam from legitimate messages on the project's labelled test set.</p>
-          </div>
-        </header>
-        <div id="metrics-body" aria-live="polite"><p class="panel state">Loading metrics&hellip;</p></div>
-      </section>
     </main>
   </div>
 {% endblock %}
