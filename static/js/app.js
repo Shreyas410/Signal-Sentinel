@@ -40,91 +40,333 @@ function feedStatusRow(name, meta) {
   return `<dt>${name}</dt><dd>${escapeHtml(state)}</dd>`;
 }
 
+
+// ---------------- Shared helpers ----------------
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+
+function escapeHtml(str) {
+  return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function sevTag(sev) {
+  const s = SEV_ORDER[sev] === undefined ? "low" : sev;
+  return `<span class="sev sev-${s}">${escapeHtml(sev || "n/a")}</span>`;
+}
+
+function statusTag(status) {
+  return `<span class="tag tag-${escapeHtml(status)}">${escapeHtml(status)}</span>`;
+}
+
+function setBusy(btn, busy, label) {
+  btn.disabled = busy;
+  if (busy) btn.setAttribute("aria-busy", "true"); else btn.removeAttribute("aria-busy");
+  if (label) btn.textContent = label;
+}
+
+async function getJson(url, opts) {
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(url + " returned " + res.status);
+  return res.json();
+}
+
+function notice(text, isError) {
+  const el = document.getElementById("decision-notice");
+  el.textContent = text;
+  el.classList.toggle("is-error", !!isError);
+}
+
+// "Path Traversal - precedent: Fortinet ..." -> ["Path Traversal", "Fortinet ..."]
+function splitRuleName(name) {
+  const i = (name || "").indexOf(" - precedent: ");
+  return i === -1 ? [name, ""] : [name.slice(0, i), name.slice(i + 14)];
+}
+
+// ---------------- Rules: queue + enforced (shared by Agent and Threat Intel) ----------------
+let intelCache = { patterns: [], domains: [] };
+const justApproved = new Set();
+
+async function loadThreatIntel() {
+  const queue = document.getElementById("queue");
+  let patterns, domains;
+  try {
+    [patterns, domains] = await Promise.all([getJson("/api/threat-intel"), getJson("/api/blocked-domains/all")]);
+  } catch (e) {
+    queue.removeAttribute("aria-busy");
+    queue.innerHTML = '<li class="panel state state-error"><strong>Could not load drafted rules.</strong> The server did not respond. Reload the page to try again.</li>';
+    document.getElementById("enforced-body").innerHTML = '<tr><td colspan="5" class="state state-error">Could not load enforced rules.</td></tr>';
+    return;
+  }
+  intelCache = { patterns, domains };
+  renderQueue();
+  renderEnforced();
+  if (typeof renderIntelTable === "function") renderIntelTable();
+}
+
+function queueItems() {
+  const { patterns, domains } = intelCache;
+  const code = patterns.filter(p => p.status === "pending").map(p => ({ kind: "code", key: p.id, rec: p }));
+  const dom = domains.filter(d => d.status === "pending").map(d => ({ kind: "domain", key: d.domain, rec: d }));
+  return code.concat(dom).sort((a, b) => (SEV_ORDER[a.rec.severity] - SEV_ORDER[b.rec.severity]) || String(b.rec.date_added).localeCompare(String(a.rec.date_added)));
+}
+
+function renderQueue() {
+  const items = queueItems();
+  const queue = document.getElementById("queue");
+  queue.removeAttribute("aria-busy");
+  document.getElementById("queue-count").textContent = items.length ? `(${items.length})` : "";
+  document.getElementById("rail-pending").textContent = items.length ? items.length : "";
+  if (!items.length) {
+    queue.innerHTML = '<li class="panel state"><strong>No rules are waiting for approval.</strong> Sync the feeds in <a href="#intel">Threat Intel</a> to draft rules for newly reported attacks.</li>';
+    return;
+  }
+  const code = items.filter(it => it.kind === "code");
+  const dom = items.filter(it => it.kind === "domain");
+  const group = (title, list, render) => list.length
+    ? `<li class="queue-group label" role="presentation">${title} (${list.length})</li>` + list.map(it => render(it.rec)).join("")
+    : "";
+  queue.innerHTML = group("Code rules drafted from CISA KEV", code, codeRuleItem)
+    + group("Domain rules drafted from OpenPhish", dom, domainRuleItem);
+}
+
+function decisionColumn(kind, key, where) {
+  return `
+    <div class="rule-decide">
+      <span class="label">Analyst decision</span>
+      <button type="button" class="btn btn-approve" data-decide="approve" data-kind="${kind}" data-key="${escapeHtml(key)}" data-where="${escapeHtml(where)}">Approve</button>
+      <button type="button" class="btn btn-reject" data-decide="reject" data-kind="${kind}" data-key="${escapeHtml(key)}">Reject</button>
+      <span class="hint" aria-live="polite"></span>
+    </div>`;
+}
+
+function codeRuleItem(p) {
+  const [category, precedent] = splitRuleName(p.name);
+  const patternCell = p.regex
+    ? `<code class="pattern">${escapeHtml(p.regex)}</code>`
+    : '<span class="muted">No automatic signature. This attack class depends on business logic a static scanner cannot infer, so approving it adds manual-review guidance only.</span>';
+  const cve = p.source_cve
+    ? (p.source_url ? `<a class="data" href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener">${escapeHtml(p.source_cve)}</a>` : `<span class="data">${escapeHtml(p.source_cve)}</span>`)
+    : "";
+  const examples = p.example_vulnerable ? `
+      <div class="examples">
+        <div><div class="label">Would flag</div><code class="pattern">${escapeHtml(p.example_vulnerable)}</code></div>
+        <div><div class="label">Suggested fix</div><code class="pattern">${escapeHtml(p.example_fixed)}</code></div>
+      </div>` : "";
+  return `
+    <li class="rule" id="rule-${cssId(p.id)}">
+      <div class="rule-body">
+        <div class="rule-title">${statusTag(p.status)} ${sevTag(p.severity)} <h3>${escapeHtml(category)}</h3></div>
+        <dl class="rule-fields">
+          <dt>Rule pattern</dt><dd>${patternCell}</dd>
+          <dt>Source entry</dt><dd>CISA KEV ${cve}${precedent ? " &middot; " + escapeHtml(precedent) : ""}<span class="cell-sub">${escapeHtml(p.description)}</span></dd>
+          <dt>Protects against</dt><dd><span class="data">${escapeHtml(p.cwe || "")}</span> ${escapeHtml(category)} in application code.${examples}</dd>
+          <dt>Enforced in</dt><dd><span class="tag tag-where">Dev/CI scanner</span></dd>
+          <dt>Rule ID</dt><dd class="data">${escapeHtml(p.id)} &middot; drafted ${escapeHtml(p.date_added)}</dd>
+        </dl>
+      </div>
+      ${decisionColumn("code", p.id, "the Dev/CI scanner")}
+    </li>`;
+}
+
+function domainRuleItem(d) {
+  const reported = d.reported_url ? `<code class="pattern break">${escapeHtml(d.reported_url)}</code>` : "";
+  return `
+    <li class="rule" id="rule-${cssId(d.domain)}">
+      <div class="rule-body">
+        <div class="rule-title">${statusTag(d.status)} ${sevTag(d.severity)} <h3 class="data">${escapeHtml(d.domain)}</h3></div>
+        <dl class="rule-fields">
+          <dt>Rule pattern</dt><dd><code class="pattern">host == ${escapeHtml(d.domain)}  OR  host ends with .${escapeHtml(d.domain)}</code></dd>
+          <dt>Source entry</dt><dd>${escapeHtml(d.source)}${reported ? '<span class="cell-sub">Reported URL</span>' + reported : ""}</dd>
+          <dt>Protects against</dt><dd>${escapeHtml(d.category)}. Any link to this domain or its subdomains in a customer message is blocked. Only the destination is checked; message content is not read.</dd>
+          <dt>Enforced in</dt><dd><span class="tag tag-where">Customer Shield link firewall</span></dd>
+          <dt>Drafted</dt><dd class="data">${escapeHtml(d.date_added)}</dd>
+        </dl>
+      </div>
+      ${decisionColumn("domain", d.domain, "the Customer Shield link firewall")}
+    </li>`;
+}
+
+const ENFORCED_PREVIEW = 8;
+let enforcedExpanded = false;
+document.getElementById("enforced-more").addEventListener("click", () => { enforcedExpanded = !enforcedExpanded; renderEnforced(); });
+
+function renderEnforced() {
+  const { patterns, domains } = intelCache;
+  const rows = patterns.filter(p => p.status === "approved").map(p => ({
+    key: p.id, date: p.date_added, sev: p.severity,
+    rule: `${escapeHtml(splitRuleName(p.name)[0])}<span class="cell-sub data">${escapeHtml(p.id)}${p.cwe ? " &middot; " + escapeHtml(p.cwe) : ""}${p.category === "dependency" ? " &middot; dependency version check" : (p.regex ? "" : " &middot; manual review only")}</span>`,
+    where: "Dev/CI scanner", source: p.source,
+  })).concat(domains.filter(d => d.status === "approved").map(d => ({
+    key: d.domain, date: d.date_added, sev: d.severity,
+    rule: `<span class="data break">${escapeHtml(d.domain)}</span><span class="cell-sub">${escapeHtml(d.category)}</span>`,
+    where: "Customer Shield link firewall", source: d.source,
+  })));
+  rows.sort((a, b) => (justApproved.has(b.key) - justApproved.has(a.key)) || String(b.date).localeCompare(String(a.date)) || (SEV_ORDER[a.sev] - SEV_ORDER[b.sev]));
+  document.getElementById("enforced-count").textContent = `(${rows.length})`;
+  const body = document.getElementById("enforced-body");
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" class="state">No rules are enforced yet. Approve a drafted rule above to start enforcing it.</td></tr>';
+    return;
+  }
+  const limit = enforcedExpanded ? rows.length : ENFORCED_PREVIEW;
+  const more = document.getElementById("enforced-more");
+  more.hidden = rows.length <= ENFORCED_PREVIEW;
+  more.textContent = enforcedExpanded ? "Show newest " + ENFORCED_PREVIEW + " only" : `Show all ${rows.length} enforced rules`;
+  more.setAttribute("aria-expanded", String(enforcedExpanded));
+  body.innerHTML = rows.slice(0, limit).map(r => `
+    <tr class="${justApproved.has(r.key) ? "is-new" : ""}">
+      <td class="top wrap">${justApproved.has(r.key) ? '<span class="tag tag-approved">just approved</span> ' : ""}${r.rule}</td>
+      <td>${sevTag(r.sev)}</td>
+      <td class="nowrap"><span class="tag tag-where">${r.where}</span></td>
+      <td class="top wrap"><span class="cell-sub">${escapeHtml(r.source)}</span></td>
+      <td class="data nowrap">${escapeHtml(r.date)}</td>
+    </tr>`).join("");
+}
+
+// Two-step decision: first click arms the button, second click within 6s commits.
+document.getElementById("queue").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-decide]");
+  if (!btn || btn.disabled) return;
+  const item = btn.closest(".rule");
+  const hint = item.querySelector(".hint");
+  const action = btn.dataset.decide;
+
+  if (!btn.classList.contains("is-confirming")) {
+    item.querySelectorAll("button[data-decide]").forEach(b => disarm(b));
+    btn.classList.add("is-confirming");
+    btn.dataset.label = btn.textContent;
+    btn.textContent = action === "approve" ? "Confirm approval" : "Confirm rejection";
+    hint.textContent = action === "approve"
+      ? `Click again to enforce this rule in ${btn.dataset.where}.`
+      : "Click again to reject. Rejected rules are not enforced.";
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { disarm(btn); hint.textContent = ""; }, 6000);
+    return;
+  }
+
+  clearTimeout(btn._t);
+  item.querySelectorAll("button[data-decide]").forEach(b => { b.disabled = true; });
+  setBusy(btn, true, action === "approve" ? "Approving" : "Rejecting");
+  hint.textContent = "";
+  const { kind, key } = btn.dataset;
+  const url = kind === "code"
+    ? `/api/threat-intel/${encodeURIComponent(key)}/${action}`
+    : `/api/blocked-domains/${encodeURIComponent(key)}/${action}`;
+  try {
+    const res = await fetch(url, { method: "POST" });
+    if (!res.ok) throw new Error(res.status);
+    if (action === "approve") {
+      justApproved.add(key);
+      notice(kind === "code"
+        ? `Approved ${key}. The Dev/CI scanner checks for it from the next scan onward.`
+        : `Approved ${key}. The Customer Shield now blocks links to this domain.`);
+    } else {
+      notice(`Rejected ${key}. It will not be enforced.`);
+    }
+    await loadThreatIntel();
+    loadFeedStatus();
+    if (action === "approve") document.getElementById("enforced-h").scrollIntoView({ block: "start", behavior: "smooth" });
+  } catch (err) {
+    notice(`Could not ${action} ${key}: the server did not accept the request. Nothing was changed.`, true);
+    item.querySelectorAll("button[data-decide]").forEach(b => { b.disabled = false; disarm(b); });
+    setBusy(btn, false);
+    btn.textContent = action === "approve" ? "Approve" : "Reject";
+  }
+});
+
+function disarm(btn) {
+  if (!btn.classList.contains("is-confirming")) return;
+  btn.classList.remove("is-confirming");
+  btn.textContent = btn.dataset.label || (btn.dataset.decide === "approve" ? "Approve" : "Reject");
+}
+
+// ---------------- Dev/CI scan ----------------
 let currentFindings = [];
 let activeSevFilter = "all";
-
-// ---------------- Repo selector ----------------
-async function loadRepos() {
-  const res = await fetch("/api/repos");
-  const repos = await res.json();
-  const sel = document.getElementById("repo-select");
-  sel.innerHTML = repos.map(r => `<option value="${r.id}">${escapeHtml(r.name)} (${r.file_count} files)</option>`).join("");
-}
-loadRepos();
-loadThreatIntel();
-loadFeedStatus();
-
-// ---------------- AI Agent feed ----------------
-const ICONS = { info: "ℹ", checking: "◐", clear: "·", found: "⚠", done: "✓", error: "✕" };
-
-function feedLine(ev) {
-  const icon = ICONS[ev.kind] || "·";
-  const sevClass = ev.kind === "found" && ev.severity ? " " + ev.severity : "";
-  return `<div class="feed-line ${ev.kind}${sevClass}"><span class="icon">${icon}</span><span>${escapeHtml(ev.text)}</span></div>`;
-}
-
+let scanStale = false;
 let polling = false;
 let eventsSeen = 0;
+
+async function loadRepos() {
+  const sel = document.getElementById("repo-select");
+  try {
+    const repos = await getJson("/api/repos");
+    sel.innerHTML = repos.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)} (${r.file_count} files)</option>`).join("");
+    sel.disabled = false;
+  } catch (e) {
+    sel.innerHTML = "<option>Could not load repositories</option>";
+    document.getElementById("run-scan-btn").disabled = true;
+  }
+}
+
+const LOG_LABEL = { info: "info", checking: "check", clear: "clear", found: "found", done: "done", error: "error" };
+
+function logLine(ev) {
+  const k = LOG_LABEL[ev.kind] || ev.kind;
+  return `<li class="${escapeHtml(ev.kind)}"><span class="k k-${escapeHtml(ev.kind)}">${escapeHtml(k)}</span><span>${escapeHtml(ev.text)}</span></li>`;
+}
 
 document.getElementById("run-scan-btn").addEventListener("click", startScan);
 
 async function startScan() {
   const btn = document.getElementById("run-scan-btn");
   const repoId = document.getElementById("repo-select").value;
-  btn.disabled = true;
-  btn.textContent = "⏳ Scanning...";
+  setBusy(btn, true, "Scanning");
+  document.getElementById("repo-select").disabled = true;
   eventsSeen = 0;
   currentFindings = [];
   scanStale = false;
-  document.getElementById("stale-banner").classList.remove("show");
-
-  const orb = document.getElementById("agent-orb");
-  orb.className = "agent-orb working";
-  document.getElementById("agent-status").textContent = "Starting up...";
-  document.getElementById("agent-meta").textContent = "";
+  document.getElementById("stale-banner").hidden = true;
+  document.getElementById("scan-summary").innerHTML = '<span class="muted">Scan running&hellip;</span>';
   document.getElementById("agent-feed").innerHTML = "";
-  document.getElementById("findings-list").innerHTML = '<div class="empty-state muted">Scanning in progress...</div>';
+  document.getElementById("findings-list").innerHTML = '<tr><td colspan="5" class="state">Scan in progress. Findings appear when it finishes.</td></tr>';
   document.getElementById("findings-count").textContent = "";
 
-  const res = await fetch("/api/scan/start", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo_id: repoId })
-  });
-  const { job_id } = await res.json();
+  try {
+    const { job_id } = await getJson("/api/scan/start", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo_id: repoId })
+    });
+    polling = true;
+    pollJob(job_id, btn, Date.now());
+  } catch (e) {
+    scanFailed(btn, "Could not start the scan: the server did not respond.");
+  }
+}
 
-  const startTime = Date.now();
-  polling = true;
-  pollJob(job_id, btn, startTime);
+function scanFailed(btn, msg) {
+  polling = false;
+  setBusy(btn, false, "Run scan");
+  document.getElementById("repo-select").disabled = false;
+  document.getElementById("scan-summary").innerHTML = `<span class="state-error">${escapeHtml(msg)}</span>`;
+  document.getElementById("findings-list").innerHTML = '<tr><td colspan="5" class="state state-error">No findings: the scan did not complete.</td></tr>';
 }
 
 async function pollJob(jobId, btn, startTime) {
   if (!polling) return;
-  const res = await fetch(`/api/scan/${jobId}/status?since=${eventsSeen}`);
-  const job = await res.json();
-
+  let job;
+  try {
+    job = await getJson(`/api/scan/${jobId}/status?since=${eventsSeen}`);
+  } catch (e) {
+    scanFailed(btn, "Lost contact with the server during the scan.");
+    return;
+  }
+  const feed = document.getElementById("agent-feed");
   if (job.events && job.events.length) {
-    const feed = document.getElementById("agent-feed");
-    job.events.forEach(ev => { feed.insertAdjacentHTML("beforeend", feedLine(ev)); });
+    job.events.forEach(ev => feed.insertAdjacentHTML("beforeend", logLine(ev)));
     feed.scrollTop = feed.scrollHeight;
     eventsSeen = job.event_count;
-    document.getElementById("agent-status").textContent = job.status_line;
   }
-
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  const checks = Array.from(document.querySelectorAll(".feed-line.found, .feed-line.clear")).length;
-  document.getElementById("agent-meta").textContent = `${checks} pattern(s) checked so far · ${elapsed}s elapsed`;
+  if (job.status === "running") {
+    document.getElementById("scan-summary").innerHTML = `<span>${escapeHtml(job.status_line)}</span><span class="muted num">${elapsed}s</span>`;
+  }
 
   if (job.status === "done") {
     polling = false;
-    document.getElementById("agent-orb").className = "agent-orb done";
     renderResults(job);
-    btn.disabled = false;
-    btn.textContent = "▶ Run AI Scan";
+    setBusy(btn, false, "Run scan");
+    document.getElementById("repo-select").disabled = false;
   } else if (job.status === "error") {
-    polling = false;
-    document.getElementById("agent-orb").className = "agent-orb idle";
-    btn.disabled = false;
-    btn.textContent = "▶ Run AI Scan";
+    scanFailed(btn, "Scan failed: " + (job.error || "unknown error"));
   } else {
     setTimeout(() => pollJob(jobId, btn, startTime), 300);
   }
@@ -132,117 +374,104 @@ async function pollJob(jobId, btn, startTime) {
 
 function renderResults(job) {
   currentFindings = job.findings;
-  const counts = job.counts || {};
-  document.getElementById("stat-critical").textContent = counts.critical || 0;
-  document.getElementById("stat-high").textContent = counts.high || 0;
-  document.getElementById("stat-medium").textContent = counts.medium || 0;
-  document.getElementById("stat-low").textContent = counts.low || 0;
-
-  const total = job.findings.length;
-  const ring = document.getElementById("badge-ring");
-  const ringText = document.getElementById("badge-ring-text");
-  const headline = document.getElementById("badge-headline");
-  const sub = document.getElementById("badge-sub");
-
-  let color = "var(--green)", word = "PASS";
-  if (counts.critical > 0) { color = "var(--critical)"; word = "BLOCK"; }
-  else if (counts.high > 0) { color = "var(--high)"; word = "WARN"; }
-
-  ring.style.background = `conic-gradient(${color} 360deg, var(--panel-border) 0deg)`;
-  ringText.textContent = word;
-  ringText.style.color = color;
-  headline.textContent = total === 0
-    ? "Tested against " + job.patterns_checked + " known attacks"
-    : `${total} vulnerabilities found`;
-  sub.textContent = `${job.repo} · Tested against ${job.patterns_checked} active patterns · Updated ${job.scanned_at}`;
-
+  const c = job.counts || {};
+  let verdict = "PASS: no critical or high findings";
+  if (c.critical > 0) verdict = "BLOCK: critical findings must be fixed before this ships";
+  else if (c.high > 0) verdict = "WARN: high-severity findings";
+  const sevCounts = ["critical", "high", "medium", "low"].map(s => `<span>${sevTag(s)} <span class="num">${c[s] || 0}</span></span>`).join("");
+  document.getElementById("scan-summary").innerHTML = `
+    <span class="verdict">${verdict}</span>
+    ${sevCounts}
+    <span class="muted">${escapeHtml(job.repo)} &middot; ${job.files_scanned} files &middot; ${job.patterns_checked} enforced rules &middot; <span class="data">${escapeHtml(job.scanned_at)}</span></span>`;
   activeSevFilter = "all";
-  document.querySelectorAll("#sev-filter .chip").forEach(c => c.classList.toggle("active", c.dataset.sev === "all"));
+  syncFilterButtons();
   renderFindingsList();
 }
 
+function syncFilterButtons() {
+  document.querySelectorAll("#sev-filter button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.sev === activeSevFilter)));
+}
+
 document.getElementById("sev-filter").addEventListener("click", e => {
-  const chip = e.target.closest(".chip");
-  if (!chip) return;
-  document.querySelectorAll("#sev-filter .chip").forEach(c => c.classList.remove("active"));
-  chip.classList.add("active");
-  activeSevFilter = chip.dataset.sev;
+  const b = e.target.closest("button");
+  if (!b) return;
+  activeSevFilter = b.dataset.sev;
+  syncFilterButtons();
   renderFindingsList();
 });
 
 function renderFindingsList() {
-  const filtered = activeSevFilter === "all" ? currentFindings : currentFindings.filter(f => f.severity === activeSevFilter);
-  document.getElementById("findings-count").textContent = `(${filtered.length}${activeSevFilter !== "all" ? " of " + currentFindings.length : ""})`;
   const list = document.getElementById("findings-list");
+  const filtered = activeSevFilter === "all" ? currentFindings : currentFindings.filter(f => f.severity === activeSevFilter);
+  document.getElementById("findings-count").textContent = currentFindings.length
+    ? `(${filtered.length}${activeSevFilter !== "all" ? " of " + currentFindings.length : ""})` : "";
   if (currentFindings.length === 0) {
-    list.innerHTML = '<div class="empty-state muted">No vulnerabilities found. Ship it. ✅</div>';
+    list.innerHTML = '<tr><td colspan="5" class="state">No findings. None of the enforced code rules matched this repository.</td></tr>';
     return;
   }
   if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty-state muted">No findings at this severity.</div>';
+    list.innerHTML = `<tr><td colspan="5" class="state">No ${escapeHtml(activeSevFilter)} findings in this scan.</td></tr>`;
     return;
   }
-  list.innerHTML = filtered.map(f => `
-    <div class="finding ${f.severity}" data-finding-id="${f.finding_id}">
-      <div class="finding-top">
-        <div class="finding-title">${escapeHtml(f.name)}</div>
-        <span class="sev-chip ${f.severity}">${f.severity}</span>
-      </div>
-      <div class="finding-loc">${escapeHtml(f.file)}:${f.line} ${f.cwe ? "· " + f.cwe : ""}</div>
-      <div class="finding-snippet">${escapeHtml(f.snippet)}</div>
-      <div class="finding-desc">${escapeHtml(f.description)}</div>
-      <div class="finding-fix">💡 Suggested fix: ${escapeHtml(f.suggested_fix)}</div>
-      <div class="finding-meta">
-        <span>Pattern ${f.pattern_id}</span>
-        <span>Source: ${escapeHtml(f.source)}</span>
-        <span>Added ${f.date_added}</span>
-      </div>
-      ${f.has_code_fix ? fixBoxHtml(f) : ""}
-    </div>`).join("");
-
-  wireFixButtons();
+  list.innerHTML = filtered.map(f => {
+    const id = cssId(f.finding_id);
+    return `
+    <tr>
+      <td>${sevTag(f.severity)}</td>
+      <td class="top wrap">${escapeHtml(f.name)}<span class="cell-sub data">${escapeHtml(f.pattern_id)}${f.cwe ? " &middot; " + escapeHtml(f.cwe) : ""}</span></td>
+      <td class="data nowrap">${escapeHtml(f.file)}:${f.line}</td>
+      <td class="data break wrap">${escapeHtml(f.snippet)}</td>
+      <td class="nowrap"><button type="button" class="btn btn-sm" aria-expanded="false" aria-controls="d-${id}" data-toggle="d-${id}" data-label="${f.has_code_fix ? "View fix" : "Details"}">${f.has_code_fix ? "View fix" : "Details"}</button></td>
+    </tr>
+    <tr class="detail" id="d-${id}" hidden>
+      <td colspan="5">
+        <div class="detail-grid">
+          <div>
+            <p>${escapeHtml(f.description)}</p>
+            <p><span class="label">Suggested fix</span><br>${escapeHtml(f.suggested_fix)}</p>
+            <p class="cell-sub">Rule source: ${escapeHtml(f.source)} &middot; added <span class="data">${escapeHtml(f.date_added)}</span></p>
+          </div>
+          <div>${f.has_code_fix ? fixBoxHtml(f) : '<p>No verified one-click fix exists for this finding. Apply the suggested fix by hand.</p>'}</div>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+  if (scanStale) disableUnappliedFixes();
 }
 
 function fixBoxHtml(f) {
-  const origLines = f.fix_original.split("\n").map(l => `<div class="diff-line removed">${escapeHtml(l)}</div>`).join("");
-  const fixedLines = f.fix_fixed.split("\n").map(l => `<div class="diff-line added">${escapeHtml(l)}</div>`).join("");
+  const del = f.fix_original.split("\n").map(l => `<div class="del">${escapeHtml(l)}</div>`).join("");
+  const add = f.fix_fixed.split("\n").map(l => `<div class="add">${escapeHtml(l)}</div>`).join("");
   return `
-    <div class="fix-box">
-      <button class="btn btn-ghost small fix-toggle" data-target="diff-${cssId(f.finding_id)}">👀 View code fix</button>
-      <div class="fix-diff hidden" id="diff-${cssId(f.finding_id)}">
-        ${origLines}
-        ${fixedLines}
-        <div class="fix-diff-actions">
-          <button class="btn btn-primary small apply-fix-btn" data-repo="${f.repo_id}" data-file="${escapeHtml(f.file)}" data-line="${f.line}" data-finding-id="${f.finding_id}">✓ Apply this fix</button>
-          <span class="fix-applied-chip hidden" data-chip-for="${f.finding_id}">✓ Applied — re-run scan to confirm</span>
-        </div>
-      </div>
+    <div class="label">Verified fix for <span class="data">${escapeHtml(f.file)}:${f.line}</span></div>
+    <div class="diff" role="group" aria-label="Code change">${del}${add}</div>
+    <div class="fix-actions">
+      <button type="button" class="btn btn-primary btn-sm apply-fix-btn" data-repo="${escapeHtml(f.repo_id)}" data-file="${escapeHtml(f.file)}" data-line="${f.line}">Apply this fix</button>
+      <span class="fix-msg" aria-live="polite"></span>
     </div>`;
 }
 
 function cssId(str) {
-  return str.replace(/[^a-zA-Z0-9]/g, "_");
+  return String(str).replace(/[^a-zA-Z0-9]/g, "_");
 }
 
-function wireFixButtons() {
-  document.querySelectorAll(".fix-toggle").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const target = document.getElementById(btn.dataset.target);
-      target.classList.toggle("hidden");
-      btn.textContent = target.classList.contains("hidden") ? "👀 View code fix" : "🔼 Hide code fix";
-    });
-  });
-  document.querySelectorAll(".apply-fix-btn").forEach(btn => {
-    btn.addEventListener("click", () => applyFix(btn));
-  });
-}
-
-let scanStale = false;
+document.getElementById("findings-list").addEventListener("click", e => {
+  const t = e.target.closest("button[data-toggle]");
+  if (t) {
+    const row = document.getElementById(t.dataset.toggle);
+    row.hidden = !row.hidden;
+    t.setAttribute("aria-expanded", String(!row.hidden));
+    t.textContent = row.hidden ? t.dataset.label : "Hide";
+    return;
+  }
+  const a = e.target.closest(".apply-fix-btn");
+  if (a) applyFix(a);
+});
 
 async function applyFix(btn) {
-  if (scanStale) return;
-  btn.disabled = true;
-  btn.textContent = "Applying...";
+  if (scanStale || btn.disabled) return;
+  const msg = btn.parentElement.querySelector(".fix-msg");
+  setBusy(btn, true, "Applying");
   try {
     const res = await fetch("/api/fix/apply", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -250,220 +479,67 @@ async function applyFix(btn) {
     });
     const result = await res.json();
     if (result.ok) {
-      btn.textContent = "✓ Applied";
-      const chip = document.querySelector(`.fix-applied-chip[data-chip-for="${btn.dataset.findingId}"]`);
-      if (chip) chip.classList.remove("hidden");
+      setBusy(btn, false, "Applied");
+      btn.disabled = true;
+      btn.dataset.applied = "1";
+      msg.textContent = "Written to the file. Re-run the scan to confirm.";
       markScanStale();
     } else {
-      btn.disabled = false;
-      btn.textContent = "✓ Apply this fix";
-      alert(result.error || "Could not apply fix.");
+      setBusy(btn, false, "Apply this fix");
+      msg.textContent = result.error || "Could not apply this fix.";
     }
   } catch (e) {
-    btn.disabled = false;
-    btn.textContent = "✓ Apply this fix";
-    alert("Could not reach the server.");
+    setBusy(btn, false, "Apply this fix");
+    msg.textContent = "Could not reach the server. Nothing was changed.";
   }
 }
 
 function markScanStale() {
   scanStale = true;
-  document.getElementById("stale-banner").classList.add("show");
-  document.querySelectorAll(".apply-fix-btn").forEach(b => { if (b.textContent !== "✓ Applied") { b.disabled = true; } });
+  document.getElementById("stale-banner").hidden = false;
+  disableUnappliedFixes();
 }
 
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function disableUnappliedFixes() {
+  document.querySelectorAll(".apply-fix-btn").forEach(b => { if (!b.dataset.applied) { b.disabled = true; b.title = "Re-run the scan first"; } });
 }
 
-// ---------------- Threat Intel tab ----------------
-async function loadThreatIntel() {
-  const [patterns, domains] = await Promise.all([
-    fetch("/api/threat-intel").then(r => r.json()),
-    fetch("/api/blocked-domains/all").then(r => r.json()),
-  ]);
-  const pending = patterns.filter(p => p.status === "pending");
-  const approved = patterns.filter(p => p.status === "approved").sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
-  const pendingDomains = domains.filter(d => d.status === "pending");
+loadRepos();
+loadThreatIntel();
+loadFeedStatus();
 
-  const totalPending = pending.length + pendingDomains.length;
-  document.getElementById("rail-pending").textContent = totalPending ? totalPending : "";
-  document.getElementById("pending-count-label").textContent = pending.length
-    ? `— ${pending.length} awaiting review`
-    : "— none right now";
-  document.getElementById("pending-domains-count-label").textContent = pendingDomains.length
-    ? `— ${pendingDomains.length} awaiting review`
-    : "— none right now";
-
-  document.getElementById("pending-list").innerHTML = pending.length
-    ? pending.map(p => reportCard(p)).join("")
-    : '<div class="empty-state muted">No new vulnerabilities pending review. Click "Sync Threat Intel from Web" to check for new ones.</div>';
-
-  document.getElementById("pending-domains-list").innerHTML = pendingDomains.length
-    ? pendingDomains.map(d => domainReportCard(d)).join("")
-    : '<div class="empty-state muted">No new scam domains pending review. Click "Sync Threat Intel from Web" to check OpenPhish for new ones.</div>';
-
-  document.getElementById("approved-list").innerHTML = approved.length
-    ? approved.map(p => intelItem(p)).join("")
-    : '<div class="empty-state muted">Nothing approved yet.</div>';
-
-  document.querySelectorAll("[data-approve]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const name = btn.dataset.name;
-      btn.disabled = true;
-      btn.textContent = "Adding to memory...";
-      await fetch(`/api/threat-intel/${btn.dataset.approve}/approve`, { method: "POST" });
-      showApproveToast(`✓ "${name}" added to the AI's memory — every future scan now checks for this.`);
-      loadThreatIntel();
-    });
-  });
-  document.querySelectorAll("[data-reject]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await fetch(`/api/threat-intel/${btn.dataset.reject}/reject`, { method: "POST" });
-      loadThreatIntel();
-    });
-  });
-  document.querySelectorAll("[data-approve-domain]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const domain = btn.dataset.approveDomain;
-      btn.disabled = true;
-      btn.textContent = "Adding to firewall...";
-      await fetch(`/api/blocked-domains/${encodeURIComponent(domain)}/approve`, { method: "POST" });
-      showApproveToast(`✓ "${domain}" added to the network firewall — blocked for every customer from now on.`);
-      loadThreatIntel();
-    });
-  });
-  document.querySelectorAll("[data-reject-domain]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const domain = btn.dataset.rejectDomain;
-      await fetch(`/api/blocked-domains/${encodeURIComponent(domain)}/reject`, { method: "POST" });
-      loadThreatIntel();
-    });
-  });
-
-  const meta = await (await fetch("/api/threat-intel/meta")).json();
-  const domainMeta = await (await fetch("/api/blocked-domains/meta")).json();
-  const statusEl = document.getElementById("sync-status");
-  if (meta.last_synced_at || domainMeta.last_synced_at) {
-    const bits = [];
-    if (meta.last_synced_at) bits.push(`Code: synced ${meta.last_synced_at}, ${meta.total_seen} CVEs scanned, ${meta.new_count} new`);
-    if (domainMeta.last_synced_at) bits.push(`Domains: synced ${domainMeta.last_synced_at}, ${domainMeta.total_seen} sites scanned, ${domainMeta.new_count} new`);
-    statusEl.textContent = bits.join(" · ");
-    statusEl.className = "sync-status muted";
-  }
-}
-
-function domainReportCard(d) {
-  return `
-    <div class="report-card">
-      <div class="report-top">
-        <div class="report-title">🚫 ${escapeHtml(d.domain)}</div>
-        <span class="sev-chip ${d.severity}">${d.severity}</span>
-      </div>
-      <div class="report-meta-row">
-        <span>${escapeHtml(d.category)}</span>
-        <span>${escapeHtml(d.source)}</span>
-        <span>Discovered ${d.date_added}</span>
-      </div>
-      <div class="report-actions">
-        <button class="btn btn-primary small" data-approve-domain="${escapeHtml(d.domain)}">🧠 Approve — add to firewall</button>
-        <button class="btn btn-ghost small" data-reject-domain="${escapeHtml(d.domain)}">✕ Reject</button>
-      </div>
-    </div>`;
-}
-
-function showApproveToast(text) {
-  const toast = document.getElementById("approve-toast");
-  toast.textContent = text;
-  toast.classList.add("show");
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => toast.classList.remove("show"), 5000);
-}
-
-function reportCard(p) {
-  const sourceLink = p.source_url ? ` · <a href="${p.source_url}" target="_blank" rel="noopener">${escapeHtml(p.source_cve || "source")}</a>` : "";
-  const examples = p.example_vulnerable ? `
-    <div class="report-examples">
-      <div class="example-box vuln">
-        <div class="example-label">⚠ Vulnerable example</div>
-        <pre class="example-code">${escapeHtml(p.example_vulnerable)}</pre>
-      </div>
-      <div class="example-box fixed">
-        <div class="example-label">✓ Fixed example</div>
-        <pre class="example-code">${escapeHtml(p.example_fixed)}</pre>
-      </div>
-    </div>` : "";
-  const manualNote = p.auto_detectable === false
-    ? '<div class="no-signature-note">ℹ No automated signature could be drafted for this one — it depends on business logic a static scanner can\'t infer. Approving it adds the report to memory for manual review guidance; it won\'t auto-flag code.</div>'
-    : "";
-  return `
-    <div class="report-card">
-      <div class="report-top">
-        <div class="report-title">${escapeHtml(p.name)}</div>
-        <span class="sev-chip ${p.severity}">${p.severity}</span>
-      </div>
-      <div class="report-meta-row">
-        <span>${p.cwe || ""}</span>
-        <span>${escapeHtml(p.source)}${sourceLink}</span>
-        <span>Discovered ${p.date_added}</span>
-      </div>
-      <div class="report-desc">${escapeHtml(p.description)}</div>
-      ${examples}
-      ${manualNote}
-      <div class="report-actions">
-        <button class="btn btn-primary small" data-approve="${p.id}" data-name="${escapeHtml(p.name)}">🧠 Approve — add to AI memory</button>
-        <button class="btn btn-ghost small" data-reject="${p.id}">✕ Reject</button>
-      </div>
-    </div>`;
-}
-
-function intelItem(p) {
-  const manualTag = p.auto_detectable === false ? '<span class="pill manual">Manual review</span>' : '<span class="pill memory">🧠 in memory</span>';
-  const sourceLink = p.source_url ? ` · <a href="${p.source_url}" target="_blank" rel="noopener">${escapeHtml(p.source_cve || "source")}</a>` : "";
-  return `
-    <div class="intel-item">
-      <div>
-        <span class="pill ${p.status}">${p.status}</span>${manualTag}
-        <div class="name">${escapeHtml(p.name)}</div>
-        <div class="desc">${escapeHtml(p.description)}</div>
-        <div class="meta">${escapeHtml(p.source)}${sourceLink} · Added ${p.date_added} · Severity: ${p.severity}</div>
-      </div>
-    </div>`;
-}
-
+// ---------------- Threat Intel: sync both feeds ----------------
+let lastSync = { code: [], domains: [] };
 document.getElementById("sync-btn").addEventListener("click", async () => {
   const btn = document.getElementById("sync-btn");
   const statusEl = document.getElementById("sync-status");
-  btn.disabled = true;
-  btn.textContent = "🌐 Syncing...";
-  statusEl.textContent = "Fetching the CISA KEV catalog and the OpenPhish domain feed...";
-  statusEl.className = "sync-status muted";
+  setBusy(btn, true, "Syncing feeds");
+  statusEl.textContent = "Fetching the CISA KEV catalog and the OpenPhish feed. Falls back to the local cache if offline.";
+  statusEl.classList.remove("state-error");
   try {
     const [codeRes, domainRes] = await Promise.all([
-      fetch("/api/threat-intel/sync", { method: "POST" }).then(r => r.json()),
-      fetch("/api/blocked-domains/sync", { method: "POST" }).then(r => r.json()),
+      getJson("/api/threat-intel/sync", { method: "POST" }),
+      getJson("/api/blocked-domains/sync", { method: "POST" }),
     ]);
     const parts = [];
-    if (codeRes.ok) {
-      parts.push(`code: scanned ${codeRes.total_seen} CVEs, ${codeRes.new_patterns.length} new pattern(s)`);
-    } else {
-      parts.push("code sync failed: " + codeRes.error);
-    }
-    if (domainRes.ok) {
-      parts.push(`domains: scanned ${domainRes.total_seen} reported sites, ${domainRes.new_domains.length} new domain(s)`);
-    } else {
-      parts.push("domain sync failed: " + domainRes.error);
-    }
-    statusEl.textContent = parts.join(" · ");
-    statusEl.className = "sync-status " + (codeRes.ok && domainRes.ok ? "ok" : "err");
+    parts.push(codeRes.ok
+      ? `CISA KEV (${codeRes.source}): ${codeRes.total_seen} CVEs read, ${codeRes.new_patterns.length} new rule(s) drafted`
+      : `CISA KEV sync failed: ${codeRes.error}`);
+    parts.push(domainRes.ok
+      ? `OpenPhish (${domainRes.source}): ${domainRes.total_seen} URLs read, ${domainRes.new_domains.length} new domain(s) drafted`
+      : `OpenPhish sync failed: ${domainRes.error}`);
+    statusEl.textContent = parts.join(". ") + ".";
+    statusEl.classList.toggle("state-error", !(codeRes.ok && domainRes.ok));
+    lastSync = { code: codeRes.ok ? codeRes.new_patterns.map(p => p.id) : [], domains: domainRes.ok ? domainRes.new_domains.map(d => d.domain) : [] };
   } catch (e) {
-    statusEl.textContent = "Sync failed: could not reach the internet.";
-    statusEl.className = "sync-status err";
+    statusEl.textContent = "Sync failed: the server did not respond. Existing rules are unchanged.";
+    statusEl.classList.add("state-error");
   }
-  btn.disabled = false;
-  btn.textContent = "🌐 Sync Threat Intel from Web";
-  loadThreatIntel();
+  setBusy(btn, false, "Sync feeds now");
+  await loadThreatIntel();
+  loadFeedStatus();
 });
+
 
 // ---------------- Scam Shield tab ----------------
 async function loadTrending() {

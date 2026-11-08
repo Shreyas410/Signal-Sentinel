@@ -25,81 +25,77 @@
     </aside>
 
     <main class="content" id="main" tabindex="-1">
-      <!-- ===================== PIPELINE TAB ===================== -->
-      <section class="app-section" id="agent" aria-label="AI Security Agent">
-        <div class="panel-head">
+      <section class="app-section" id="agent" aria-labelledby="agent-h">
+        <header class="page-head">
           <div>
-            <h1>AI Code Security Agent</h1>
-            <p class="muted">Picks a repository, checks it live against every analyst-approved attack pattern, and explains what it finds.</p>
+            <h1 id="agent-h">AI Security Agent</h1>
+            <p>The agent drafts detection rules from the CISA KEV and OpenPhish feeds. A rule does nothing until an analyst approves it here. After approval it is enforced by the Dev/CI scanner or the Customer Shield link firewall.</p>
           </div>
-          <div class="run-controls">
-            <select id="repo-select" class="select"></select>
-            <button class="btn btn-primary" id="run-scan-btn">▶ Run AI Scan</button>
-          </div>
-        </div>
+        </header>
 
-        <div class="agent-card">
-          <div class="agent-orb-wrap">
-            <div class="agent-orb idle" id="agent-orb">
-              <div class="agent-orb-core"></div>
-            </div>
-          </div>
-          <div class="agent-main">
-            <div class="agent-status" id="agent-status">Idle — pick a repository and click <b>Run AI Scan</b>.</div>
-            <div class="agent-meta" id="agent-meta"></div>
-            <div class="agent-feed" id="agent-feed">
-              <div class="feed-empty muted">The agent's reasoning will appear here, step by step, as it checks the code.</div>
-            </div>
-          </div>
-        </div>
+        <div class="notice" id="decision-notice" role="status" aria-live="polite"></div>
 
-        <div class="grid-2">
-          <div class="card badge-card" id="badge-card">
-            <div class="card-title">Security badge</div>
-            <div class="badge-display" id="badge-display">
-              <div class="badge-ring" id="badge-ring">
-                <span id="badge-ring-text">—</span>
-              </div>
-              <div class="badge-copy">
-                <div class="badge-headline" id="badge-headline">Not scanned yet</div>
-                <div class="badge-sub" id="badge-sub">Run a scan to generate this build's badge.</div>
-              </div>
+        <section aria-labelledby="queue-h">
+          <div class="block-head">
+            <h2 id="queue-h">Rules awaiting analyst approval <span class="count" id="queue-count"></span></h2>
+            <p>Approving takes two clicks, Approve and then Confirm, so a rule is never enforced by accident.</p>
+          </div>
+          <ol class="queue" id="queue" aria-busy="true">
+            <li class="panel state">Loading drafted rules&hellip;</li>
+          </ol>
+        </section>
+
+        <section class="block" aria-labelledby="enforced-h">
+          <div class="block-head">
+            <h2 id="enforced-h">Enforced <span class="count" id="enforced-count"></span></h2>
+            <p>Approved rules and where each one is applied. Newest first.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Rule</th><th scope="col">Severity</th><th scope="col">Enforced in</th><th scope="col">Source</th><th scope="col">Added</th></tr></thead>
+              <tbody id="enforced-body"><tr><td colspan="5" class="state">Loading&hellip;</td></tr></tbody>
+            </table>
+          </div>
+          <button type="button" class="link-btn" id="enforced-more" aria-controls="enforced-body" hidden></button>
+        </section>
+
+        <section class="block" aria-labelledby="scan-h">
+          <div class="block-head">
+            <div>
+              <h2 id="scan-h">Dev/CI scan</h2>
+              <p>Runs every enforced code rule against a repository and reports each match with its file and line.</p>
             </div>
-            <div class="stat-row" id="stat-row">
-              <div class="stat"><div class="stat-num" id="stat-critical">0</div><div class="stat-label sev-critical">Critical</div></div>
-              <div class="stat"><div class="stat-num" id="stat-high">0</div><div class="stat-label sev-high">High</div></div>
-              <div class="stat"><div class="stat-num" id="stat-medium">0</div><div class="stat-label sev-medium">Medium</div></div>
-              <div class="stat"><div class="stat-num" id="stat-low">0</div><div class="stat-label sev-low">Low</div></div>
+            <div class="toolbar">
+              <label class="sr-only" for="repo-select">Repository</label>
+              <select id="repo-select" disabled><option>Loading repositories&hellip;</option></select>
+              <button class="btn btn-primary" id="run-scan-btn" type="button">Run scan</button>
             </div>
           </div>
-          <div class="card">
-            <div class="card-title">How this scan works</div>
-            <ol class="howitworks">
-              <li><b>Connect</b> — load the selected repository's files.</li>
-              <li><b>Load intel</b> — pull the current analyst-approved pattern library (see Threat Intel tab).</li>
-              <li><b>Check</b> — test the code against each pattern live, one at a time.</li>
-              <li><b>Explain</b> — for every match, show the file, the line, why it matters, and a concrete fix.</li>
+          <div class="panel">
+            <div class="scan-summary" id="scan-summary"><span class="muted">No scan run yet in this session.</span></div>
+            <ol class="log" id="agent-feed" aria-live="polite" aria-label="Scan log">
+              <li class="clear"><span class="k">idle</span><span>The scan log appears here, one rule at a time.</span></li>
             </ol>
           </div>
-        </div>
 
-        <div class="stale-banner" id="stale-banner">⚠ Code was just updated by an applied fix. Re-run the AI scan to refresh line numbers before applying another fix.</div>
-
-        <div class="card">
-          <div class="card-title-row">
-            <div class="card-title">Findings <span class="muted" id="findings-count"></span></div>
-            <div class="sev-filter" id="sev-filter">
-              <button class="chip active" data-sev="all">All</button>
-              <button class="chip" data-sev="critical">Critical</button>
-              <button class="chip" data-sev="high">High</button>
-              <button class="chip" data-sev="medium">Medium</button>
-              <button class="chip" data-sev="low">Low</button>
+          <div class="block-head block">
+            <h3>Findings <span class="count" id="findings-count"></span></h3>
+            <div class="filter" id="sev-filter" role="group" aria-label="Filter by severity">
+              <button type="button" data-sev="all" aria-pressed="true">All</button>
+              <button type="button" data-sev="critical" aria-pressed="false">Critical</button>
+              <button type="button" data-sev="high" aria-pressed="false">High</button>
+              <button type="button" data-sev="medium" aria-pressed="false">Medium</button>
+              <button type="button" data-sev="low" aria-pressed="false">Low</button>
             </div>
           </div>
-          <div id="findings-list" class="findings-list">
-            <div class="empty-state muted">No findings yet — run a scan.</div>
+          <div class="notice is-error stale" id="stale-banner" hidden>Code changed after a fix was applied. Re-run the scan before applying another fix so line numbers are current.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Location</th><th scope="col">Matched code</th><th scope="col"><span class="sr-only">Details</span></th></tr></thead>
+              <tbody id="findings-list"><tr><td colspan="5" class="state">Run a scan to see findings.</td></tr></tbody>
+            </table>
           </div>
-        </div>
+        </section>
       </section>
 
       <!-- ===================== THREAT INTEL TAB ===================== -->
@@ -113,34 +109,7 @@
         </div>
         <div class="sync-status muted" id="sync-status">Not synced yet this session.</div>
 
-        <div class="alert-banner" id="approve-toast"></div>
-
-        <div class="new-vuln-section">
-          <div class="new-vuln-head">
-            <span class="bell">🔔</span>
-            <div>
-              <div class="new-vuln-title">New AI-Detected Vulnerabilities <span class="muted" id="pending-count-label"></span></div>
-              <div class="muted">Not yet active in the scanner — review each report below and approve to add it to the AI's memory.</div>
-            </div>
-          </div>
-          <div id="pending-list" class="report-list"></div>
-        </div>
-
-        <div class="new-vuln-section">
-          <div class="new-vuln-head">
-            <span class="bell">🚫</span>
-            <div>
-              <div class="new-vuln-title">New Scam Domains Pending Review <span class="muted" id="pending-domains-count-label"></span></div>
-              <div class="muted">Not yet active in the firewall — approve to start blocking connections to it.</div>
-            </div>
-          </div>
-          <div id="pending-domains-list" class="report-list"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">🧠 In AI memory — active in every scan</div>
-          <div id="approved-list" class="intel-list"></div>
-        </div>
+        <p class="muted">Drafted rules are reviewed in <a href="#agent">AI Security Agent</a>.</p>
       </section>
 
       <!-- ===================== SCAM SHIELD TAB ===================== -->

@@ -103,6 +103,7 @@ td.state { height: auto; }
 .feed-status dt { color: var(--text); font-weight: 500; }
 .feed-status dd { margin: 0 0 var(--space-2); font-family: var(--font-data); }
 .app-section[hidden] { display: none; }
+.shell > * { min-width: 0; }  /* let the narrow-screen rail scroll instead of widening the page */
 
 @media (max-width: 760px) {
   .rail { align-items: stretch; }
@@ -130,8 +131,10 @@ td.state { height: auto; }
 .pattern {
   display: block; background: var(--bg); border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
-  overflow-x: auto; white-space: pre; color: var(--text);
+  white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text);
 }
+.queue-group { margin: var(--space-4) 0 var(--space-2); }
+.queue-group:first-child { margin-top: 0; }
 .examples { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .examples .label { margin-bottom: var(--space-1); }
 .rule-decide {
@@ -159,6 +162,7 @@ td.wrap, th.wrap { white-space: normal; }
 td { vertical-align: middle; }
 td.top { vertical-align: top; padding-top: var(--space-2); padding-bottom: var(--space-2); }
 tr.is-new td:first-child { box-shadow: inset var(--border-accent) 0 0 var(--accent); }
+.table-wrap { position: relative; }  /* keeps .sr-only header labels inside the scroll box */
 .table-wrap table { min-width: 40rem; }
 .table-wrap.fit table { min-width: 0; }
 th button.sort {
